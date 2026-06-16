@@ -1,0 +1,2357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bible Knowledge Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<style>
+/* ── RESET & BASE ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:         #F5F0E8;
+  --bg-panel:   #EDE6D8;
+  --bg-sidebar: #E8E0CF;
+  --bg-detail:  #FDFAF5;
+  --border:     #CEC3AF;
+  --border-lt:  #DDD4C2;
+  --text:       #1C1814;
+  --text-md:    #4A4236;
+  --text-sm:    #6E6254;
+  --accent:     #6B3A2A;
+  --accent-lt:  #8A4E3A;
+  --header-bg:  #242018;
+  --header-txt: #E8DFC8;
+  --option-h:   38px;
+  --header-h:   56px;
+  --sidebar-w:  252px;
+  --detail-w:   320px;
+  --font-serif: 'EB Garamond', Georgia, 'Times New Roman', serif;
+  --font-ui:    system-ui, -apple-system, sans-serif;
+}
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 13px; }
+
+/* ── OPTION SWITCHER ─────────────────────────────────────────────────────── */
+#option-switcher {
+  height: var(--option-h);
+  background: var(--header-bg);
+  display: flex; align-items: center; gap: 2px;
+  padding: 0 16px;
+  border-bottom: 1px solid #3A3428;
+  flex-shrink: 0;
+}
+#option-switcher .opt-label {
+  font-size: 10.5px; letter-spacing: .06em; color: #7A7060; text-transform: uppercase;
+  margin-right: 10px; font-family: var(--font-ui);
+}
+[data-option] {
+  padding: 5px 14px; font-size: 12px; border-radius: 3px; border: 1px solid #4A4030;
+  background: transparent; color: #9A9080; cursor: pointer; font-family: var(--font-ui);
+  transition: all .15s;
+}
+[data-option].active { background: #4A3828; color: #E8D8B8; border-color: #7A5838; }
+[data-option]:hover:not(.active) { background: #2E2820; color: #C8B898; }
+.opt-desc {
+  font-size: 10.5px; color: #5A5040; margin-left: 16px; font-style: italic;
+  font-family: var(--font-serif);
+}
+
+/* ── APP SHELL ───────────────────────────────────────────────────────────── */
+#app-shell {
+  display: flex; flex-direction: column;
+  height: calc(100vh - var(--option-h));
+}
+
+/* ── HEADER ──────────────────────────────────────────────────────────────── */
+#app-header {
+  height: var(--header-h); background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px; padding: 0 16px;
+  flex-shrink: 0; z-index: 10;
+}
+#app-title {
+  font-family: var(--font-serif); font-size: 18px; font-weight: 600;
+  color: var(--text); white-space: nowrap; letter-spacing: -.01em;
+}
+#app-title span { color: var(--accent); }
+.header-sep { width: 1px; height: 28px; background: var(--border); flex-shrink: 0; }
+
+/* Search */
+#search-container { position: relative; flex: 1; max-width: 360px; }
+#search-input {
+  width: 100%; padding: 7px 12px 7px 32px; font-size: 13px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--bg-detail); color: var(--text); font-family: var(--font-ui);
+  outline: none; transition: border-color .15s;
+}
+#search-input:focus { border-color: var(--accent); }
+#search-icon {
+  position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  color: var(--text-sm); font-size: 12px; pointer-events: none;
+}
+#search-dropdown {
+  display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--bg-detail); border: 1px solid var(--border); border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.12); z-index: 100; overflow: hidden;
+}
+.search-item {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  cursor: pointer; transition: background .1s;
+}
+.search-item:hover { background: var(--bg-panel); }
+.search-item-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 5px; border-radius: 2px;
+  flex-shrink: 0; font-family: var(--font-ui);
+}
+.search-item-label { flex: 1; font-size: 13px; font-family: var(--font-serif); }
+.search-item-label mark { background: #F5D88A; color: inherit; padding: 0 1px; }
+.search-item-type { font-size: 10.5px; color: var(--text-sm); }
+
+/* View toggles */
+#view-controls { display: flex; gap: 2px; }
+[data-view] {
+  padding: 5px 13px; font-size: 12px; border: 1px solid var(--border-lt);
+  background: transparent; color: var(--text-md); cursor: pointer; border-radius: 3px;
+  font-family: var(--font-ui); transition: all .15s;
+}
+[data-view].active { background: var(--accent); color: white; border-color: var(--accent); }
+[data-view]:hover:not(.active) { background: var(--bg-sidebar); }
+
+/* ── BODY ────────────────────────────────────────────────────────────────── */
+#app-body {
+  flex: 1; display: flex; overflow: hidden;
+  min-height: 0;
+}
+
+/* ── SIDEBAR ─────────────────────────────────────────────────────────────── */
+#sidebar {
+  width: var(--sidebar-w); flex-shrink: 0;
+  background: var(--bg-sidebar); border-right: 1px solid var(--border);
+  overflow-y: auto; padding: 12px 0;
+}
+.sidebar-section { padding: 10px 14px; border-bottom: 1px solid var(--border-lt); }
+.sidebar-label {
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--text-sm); margin-bottom: 8px; font-weight: 600;
+}
+.toggle-row { display: flex; gap: 4px; }
+.tog-btn {
+  flex: 1; padding: 5px 0; font-size: 11.5px; border: 1px solid var(--border);
+  background: var(--bg); border-radius: 3px; cursor: pointer; color: var(--text-md);
+  font-family: var(--font-ui); transition: all .12s;
+}
+.tog-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+.filter-check {
+  display: flex; align-items: center; gap: 7px; margin-bottom: 6px;
+  cursor: pointer; font-size: 12.5px; color: var(--text-md);
+}
+.filter-check input { display: none; }
+.check-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  opacity: .85; transition: opacity .1s;
+}
+.filter-check input:not(:checked) ~ .check-dot { opacity: .25; }
+.filter-check input:not(:checked) ~ span { color: var(--text-sm); }
+.sb-select {
+  width: 100%; padding: 5px 8px; font-size: 12px; border: 1px solid var(--border);
+  background: var(--bg); border-radius: 3px; color: var(--text-md);
+  font-family: var(--font-ui); cursor: pointer; outline: none;
+}
+.legend-grid { display: flex; flex-direction: column; gap: 5px; }
+.legend-item { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--text-md); }
+.legend-text { font-family: var(--font-serif); }
+.sidebar-stats { }
+.count-row {
+  display: flex; align-items: center; gap: 6px; padding: 2px 0;
+  font-size: 11.5px; color: var(--text-md);
+}
+.count-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.count-num { margin-left: auto; font-weight: 600; color: var(--text); }
+.total-row { border-top: 1px solid var(--border-lt); margin-top: 4px; padding-top: 5px; color: var(--text-sm); }
+
+/* ── MAIN VIEW ───────────────────────────────────────────────────────────── */
+#main-view { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+
+/* Network */
+#network-view {
+  flex: 1; display: flex; position: relative;
+  background: #FAFAF6;
+  background-image: radial-gradient(circle, #D8CEB8 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.network-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; }
+
+/* Timeline */
+#timeline-view { flex: 1; display: none; flex-direction: column; overflow: hidden; background: var(--bg); }
+
+.tl-bar {
+  display: flex; overflow-x: auto; flex-shrink: 0;
+  border-bottom: 2px solid var(--border);
+  background: var(--bg-panel);
+}
+.tl-bar::-webkit-scrollbar { height: 4px; }
+.tl-bar::-webkit-scrollbar-thumb { background: var(--border); }
+.tl-period {
+  padding: 10px 16px; min-width: 140px; cursor: pointer; flex-shrink: 0;
+  border-right: 1px solid var(--border-lt); transition: background .12s;
+}
+.tl-period:hover { background: var(--bg-sidebar); }
+.tl-period.tl-active { background: var(--bg-sidebar); }
+.tl-period-name { font-family: var(--font-serif); font-size: 13px; font-weight: 600; color: var(--text); }
+.tl-period-years { font-size: 10px; color: var(--text-sm); margin-top: 2px; }
+.tl-period-count { font-size: 10px; color: var(--text-sm); margin-top: 1px; }
+
+.tl-content { flex: 1; overflow-y: auto; padding: 16px 20px; }
+.tl-content-header {
+  display: flex; align-items: baseline; gap: 10px; margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-lt); padding-bottom: 10px;
+}
+.tl-content-header h3 { font-family: var(--font-serif); font-size: 20px; font-weight: 600; }
+.tl-years-badge {
+  font-size: 11px; color: var(--text-sm); background: var(--bg-panel);
+  border: 1px solid var(--border-lt); padding: 2px 8px; border-radius: 10px;
+}
+.tl-count-badge {
+  font-size: 11px; color: var(--text-sm); margin-left: auto;
+}
+
+.tl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.tl-card {
+  background: var(--bg-detail); border: 1px solid var(--border-lt);
+  border-radius: 5px; border-top: 3px solid var(--node-color, #888);
+  overflow: hidden; transition: box-shadow .15s;
+}
+.tl-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+.tl-card.theme-card { border-top-style: dashed; opacity: .92; }
+.tl-card-header {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+  cursor: pointer; border-bottom: 1px solid var(--border-lt);
+}
+.tl-card-type {
+  font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 2px;
+  text-transform: uppercase; letter-spacing: .05em; flex-shrink: 0;
+}
+.tl-card-title { flex: 1; font-family: var(--font-serif); font-size: 15px; font-weight: 600; color: var(--text); }
+.tl-expand-btn {
+  width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border-lt);
+  background: var(--bg-panel); cursor: pointer; font-size: 9px; color: var(--text-sm);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  transition: background .12s;
+}
+.tl-expand-btn:hover { background: var(--border-lt); }
+.tl-card-summary {
+  padding: 8px 12px; font-size: 12px; color: var(--text-md); line-height: 1.55;
+  font-family: var(--font-serif);
+}
+.tl-card-relations { padding: 0 12px 8px; border-top: 1px solid var(--border-lt); margin-top: 4px; }
+.tl-card-relations.hidden { display: none; }
+.tl-rel {
+  display: flex; align-items: center; gap: 6px; padding: 5px 0;
+  border-bottom: 1px solid var(--border-lt); cursor: pointer;
+  font-size: 12px; transition: opacity .1s;
+}
+.tl-rel:hover { opacity: .75; }
+.tl-rel:last-child { border-bottom: none; }
+.tl-rel-dir { color: var(--text-sm); font-size: 11px; width: 12px; }
+.tl-rel-lbl { color: var(--text-sm); font-style: italic; font-family: var(--font-serif); flex-shrink: 0; }
+.tl-rel-node { font-weight: 600; font-family: var(--font-serif); font-size: 13px; }
+.tl-rel-none { padding: 8px 0; font-size: 11.5px; color: var(--text-sm); font-style: italic; }
+.tl-passages { padding: 6px 12px 10px; display: flex; flex-wrap: wrap; gap: 4px; }
+.tl-passages.hidden { display: none; }
+.tl-empty { text-align: center; color: var(--text-sm); padding: 40px; font-family: var(--font-serif); font-style: italic; }
+
+/* Map */
+#map-view { flex: 1; display: none; align-items: center; justify-content: center; background: var(--bg); overflow: hidden; }
+.map-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; }
+.map-title-bar {
+  background: var(--bg-panel); border-bottom: 1px solid var(--border);
+  padding: 7px 16px; font-size: 11px; color: var(--text-sm); font-family: var(--font-serif);
+  font-style: italic; flex-shrink: 0;
+}
+.geo-svg { flex: 1; width: 100%; min-height: 0; }
+.map-legend { background: var(--bg-panel); border-top: 1px solid var(--border); padding: 6px 16px; flex-shrink: 0; }
+.map-legend-title { font-size: 11px; color: var(--text-sm); font-style: italic; font-family: var(--font-serif); }
+
+/* ── DETAIL PANEL ────────────────────────────────────────────────────────── */
+#detail-panel {
+  width: 0; flex-shrink: 0; overflow: hidden;
+  background: var(--bg-detail); border-left: 1px solid var(--border);
+  transition: width .2s ease; display: flex; flex-direction: column;
+}
+#detail-panel.open { width: var(--detail-w); overflow-y: auto; }
+
+.dp-header {
+  padding: 16px 16px 12px; position: relative;
+  border-bottom: 1px solid var(--border-lt);
+}
+.dp-badge {
+  display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px;
+  border-radius: 2px; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px;
+}
+.dp-title {
+  font-family: var(--font-serif); font-size: 22px; font-weight: 600; color: var(--text);
+  line-height: 1.2; margin-bottom: 4px;
+}
+.dp-testament { font-size: 11px; color: var(--text-sm); }
+.dp-close {
+  position: absolute; top: 14px; right: 14px; width: 24px; height: 24px;
+  border-radius: 50%; border: 1px solid var(--border); background: var(--bg-panel);
+  cursor: pointer; font-size: 10px; color: var(--text-sm); display: flex;
+  align-items: center; justify-content: center; transition: background .1s;
+}
+.dp-close:hover { background: var(--border-lt); }
+
+.dp-section { padding: 12px 16px; border-bottom: 1px solid var(--border-lt); }
+.dp-section:last-child { border-bottom: none; }
+.dp-section-label {
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--text-sm); font-weight: 600; margin-bottom: 6px;
+}
+.dp-dates { font-family: var(--font-serif); font-size: 14px; color: var(--text-md); }
+.dp-period { border-radius: 3px; font-family: var(--font-serif); }
+.dp-geo { font-family: var(--font-serif); font-size: 14px; color: var(--text-md); }
+.dp-summary {
+  font-family: var(--font-serif); font-size: 14px; line-height: 1.65;
+  color: var(--text-md); text-wrap: pretty;
+}
+.dp-passages { display: flex; flex-wrap: wrap; gap: 4px; }
+
+.passage-tag {
+  font-size: 11.5px; padding: 2px 8px; background: var(--bg-panel);
+  border: 1px solid var(--border-lt); border-radius: 3px; color: var(--accent);
+  font-family: var(--font-serif); white-space: nowrap;
+}
+
+.dp-relations { display: flex; flex-direction: column; gap: 0; }
+.rel-item {
+  display: flex; align-items: center; gap: 6px; padding: 6px 0;
+  border-bottom: 1px solid var(--border-lt); cursor: pointer; transition: background .1s;
+}
+.rel-item:last-child { border-bottom: none; }
+.rel-item:hover { background: var(--bg-panel); margin: 0 -16px; padding: 6px 16px; }
+.rel-dir { font-size: 11px; color: var(--text-sm); width: 14px; flex-shrink: 0; }
+.rel-label { font-style: italic; color: var(--text-sm); font-size: 11.5px; font-family: var(--font-serif); flex-shrink: 0; min-width: 80px; }
+.rel-target { font-family: var(--font-serif); font-size: 13px; font-weight: 600; flex: 1; }
+.rel-type-badge {
+  font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 2px; flex-shrink: 0;
+}
+
+/* ── EMPTY STATE ─────────────────────────────────────────────────────────── */
+.empty-hint {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; pointer-events: none;
+  opacity: .45; gap: 8px;
+}
+.empty-hint-title { font-family: var(--font-serif); font-size: 15px; color: var(--text-md); font-style: italic; }
+.empty-hint-sub { font-size: 11.5px; color: var(--text-sm); }
+
+/* ── OPTION B LAYOUT TWEAKS ──────────────────────────────────────────────── */
+#app-shell[data-option="B"] .tl-bar {
+  background: #ECEAD8;
+}
+#app-shell[data-option="B"] .tl-period.tl-active {
+  background: white;
+}
+
+/* ── TOOLTIP ────────────────────────────────────────────────────────────── */
+#node-tooltip {
+  display: none; position: fixed; z-index: 200; pointer-events: none;
+  background: var(--bg-detail); border: 1px solid var(--border);
+  border-radius: 4px; padding: 8px 12px;
+  box-shadow: 0 3px 12px rgba(0,0,0,.14);
+  max-width: 200px;
+}
+.tt-type { font-size: 9.5px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; margin-bottom: 3px; }
+.tt-name { font-family: var(--font-serif); font-size: 15px; font-weight: 600; color: var(--text); }
+.tt-dates { font-size: 10.5px; color: var(--text-sm); margin-top: 3px; font-family: var(--font-serif); font-style: italic; }
+
+/* ── BREADCRUMB ──────────────────────────────────────────────────────────── */
+.dp-breadcrumb {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 3px;
+  padding: 6px 16px 0; font-size: 11px; color: var(--text-sm);
+  border-bottom: 1px solid var(--border-lt); margin-bottom: 0; padding-bottom: 6px;
+}
+.bc-item {
+  cursor: pointer; color: var(--accent); font-family: var(--font-serif);
+  transition: opacity .12s;
+}
+.bc-item:hover { opacity: .7; }
+.bc-sep { color: var(--border); font-size: 10px; }
+.bc-current { color: var(--text-md); font-family: var(--font-serif); }
+
+/* ── PATH FINDER ─────────────────────────────────────────────────────────── */
+.pf-container { display: flex; flex-direction: column; gap: 4px; }
+.pf-find-btn {
+  margin-top: 4px; padding: 6px 10px; background: var(--accent); color: white;
+  border: none; border-radius: 3px; font-size: 12px; cursor: pointer;
+  font-family: var(--font-ui); transition: opacity .12s;
+}
+.pf-find-btn:hover { opacity: .85; }
+.pf-result { padding: 0; }
+#pf-result { margin-top: 6px; }
+.pf-msg { font-size: 11.5px; color: var(--text-sm); font-style: italic; padding: 4px 0; font-family: var(--font-serif); }
+.pf-chain {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 3px;
+  padding: 6px 0; font-family: var(--font-serif);
+}
+.pf-node { font-size: 12.5px; font-weight: 600; cursor: pointer; transition: opacity .12s; }
+.pf-node:hover { opacity: .7; }
+.pf-arr { color: var(--text-sm); font-size: 11px; }
+.pf-info { font-size: 10.5px; color: var(--text-sm); padding: 2px 0 4px; }
+.pf-clear-btn {
+  font-size: 10.5px; padding: 3px 8px; border: 1px solid var(--border);
+  background: var(--bg); border-radius: 3px; cursor: pointer; color: var(--text-sm);
+  font-family: var(--font-ui);
+}
+.pf-clear-btn:hover { background: var(--bg-panel); }
+
+/* ── TOOL CONTROLS (edge-label + color-mode) ─────────────────────────────── */
+#tool-controls { display: flex; gap: 2px; flex-shrink: 0; }
+.tool-btn {
+  padding: 5px 11px; font-size: 11.5px; border: 1px solid var(--border-lt);
+  background: transparent; color: var(--text-sm); cursor: pointer; border-radius: 3px;
+  font-family: var(--font-ui); transition: all .15s; white-space: nowrap;
+}
+.tool-btn.active { background: var(--bg-sidebar); color: var(--text); border-color: var(--border); }
+.tool-btn:hover:not(.active) { background: var(--bg-panel); }
+
+/* ── RELATIONSHIP TYPE FILTER ────────────────────────────────────────────── */
+.rel-type-filters { display: flex; flex-direction: column; gap: 3px; }
+.rel-type-btn {
+  display: flex; align-items: center; gap: 7px; padding: 5px 8px;
+  border: 1px solid var(--border); border-left: 3px solid transparent;
+  border-radius: 3px; background: var(--bg);
+  cursor: pointer; font-size: 11.5px; color: var(--text-md);
+  font-family: var(--font-ui); text-align: left; transition: all .12s; line-height: 1.3;
+}
+.rel-type-btn.active {
+  background: var(--bg-panel);
+  border-left-color: var(--rt-color, var(--accent));
+  font-weight: 600; color: var(--text);
+}
+.rel-type-btn:hover:not(.active) { background: var(--bg-panel); }
+
+/* ── FOOTER CREDIT ───────────────────────────────────────────────────────── */
+#app-footer {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+  padding: 4px 16px; text-align: center;
+  font-size: 10.5px; color: var(--text-sm); font-family: var(--font-serif);
+  font-style: italic; background: var(--bg-panel);
+  border-top: 1px solid var(--border-lt);
+}
+#app-footer a { color: var(--accent); text-decoration: none; }
+#app-footer a:hover { text-decoration: underline; }
+#app-shell { height: calc(100vh - var(--option-h) - 22px); }
+
+/* ── PRINT ──────────────────────────────────────────────────────────────── */
+@media print {
+  #option-switcher, #app-header, #sidebar, #tool-controls { display: none !important; }
+  #app-body { display: block !important; }
+  #detail-panel.open { width: 100% !important; border: none; overflow: visible; }
+  .dp-section { break-inside: avoid; }
+}
+
+/* ── SCROLLBARS ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #B0A898; }
+
+/* ── TABLET (max 1024px) ─────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  :root { --sidebar-w: 200px; --detail-w: 280px; }
+  #app-title { font-size: 15px; }
+  .tl-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+}
+
+/* ── MOBILE (max 700px) ──────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  :root { --sidebar-w: 100%; --detail-w: 100%; }
+  #app-header { flex-wrap: wrap; height: auto; padding: 8px 12px; gap: 8px; }
+  #app-title { font-size: 14px; }
+  #search-container { max-width: 100%; order: 3; flex-basis: 100%; }
+  .header-sep { display: none; }
+  #app-body { flex-direction: column; }
+  #sidebar {
+    width: 100%; height: auto; max-height: 0; overflow: hidden;
+    transition: max-height .25s ease; border-right: none; border-bottom: 1px solid var(--border);
+  }
+  #sidebar.mobile-open { max-height: 320px; }
+  #detail-panel.open { width: 100%; position: absolute; bottom: 0; left: 0; right: 0; z-index: 50; max-height: 65vh; border-left: none; border-top: 2px solid var(--border); }
+  .tl-grid { grid-template-columns: 1fr; }
+  #option-switcher { flex-wrap: wrap; height: auto; padding: 6px 10px; gap: 4px; }
+  .opt-desc { display: none; }
+  #mobile-sidebar-toggle { display: flex; }
+}
+@media (min-width: 701px) { #mobile-sidebar-toggle { display: none; } }
+</style>
+<template id="__bundler_thumbnail" data-bg-color="#F5F0E8">
+  <svg viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg">
+    <!-- Edges -->
+    <line x1="150" y1="98" x2="78" y2="58"  stroke="#2E5B8A" stroke-width="1.4" opacity=".55"/>
+    <line x1="150" y1="98" x2="222" y2="58" stroke="#7A2A3A" stroke-width="1.4" stroke-dasharray="3,2" opacity=".55"/>
+    <line x1="150" y1="98" x2="205" y2="152" stroke="#3D7340" stroke-width="1.4" opacity=".55"/>
+    <line x1="150" y1="98" x2="88" y2="152" stroke="#B8922A" stroke-width="1.4" stroke-dasharray="6,3" opacity=".55"/>
+    <line x1="78"  y1="58" x2="38" y2="98"  stroke="#5A3A7A" stroke-width="1.4" opacity=".55"/>
+    <line x1="222" y1="58" x2="262" y2="98" stroke="#3A6A9A" stroke-width="1.4" stroke-dasharray="10,3,2,3" opacity=".55"/>
+    <line x1="150" y1="98" x2="150" y2="35" stroke="#8A5A1A" stroke-width="1.4" opacity=".55"/>
+    <!-- Central node — Person -->
+    <circle cx="150" cy="98" r="19" fill="#E8EFF7" stroke="#2E5B8A" stroke-width="2.2"/>
+    <text x="150" y="103" text-anchor="middle" font-family="Georgia,serif" font-size="11" fill="#2E5B8A" font-weight="700">P</text>
+    <!-- Place — diamond -->
+    <polygon points="205,143 215,152 205,161 195,152" fill="#EBF3EB" stroke="#3D7340" stroke-width="1.6"/>
+    <!-- Prophecy — star -->
+    <polygon points="222,47 224,54 231,54 225,58 228,65 222,61 216,65 219,58 213,54 220,54" fill="#F5E8EB" stroke="#7A2A3A" stroke-width="1.4"/>
+    <!-- Theme — hexagon -->
+    <polygon points="88,144 95,148 95,156 88,160 81,156 81,148" fill="#EFE8F5" stroke="#5A3A7A" stroke-width="1.4"/>
+    <!-- Book — rounded rect -->
+    <rect x="30" y="88" width="16" height="20" rx="3" fill="#E3F2F2" stroke="#1A6B6B" stroke-width="1.4"/>
+    <rect x="254" y="88" width="16" height="20" rx="3" fill="#E3F2F2" stroke="#1A6B6B" stroke-width="1.4"/>
+    <!-- Person top -->
+    <circle cx="150" cy="28" r="10" fill="#E8EFF7" stroke="#2E5B8A" stroke-width="1.6"/>
+    <!-- OT person left -->
+    <circle cx="78" cy="58" r="11" fill="#E8EFF7" stroke="#2E5B8A" stroke-width="1.6"/>
+    <!-- Title -->
+    <text x="150" y="186" text-anchor="middle" font-family="Georgia,serif" font-size="10" fill="#4A4236" letter-spacing=".08em">BIBLE KNOWLEDGE MAP</text>
+  </svg>
+</template>
+</head>
+<body>
+
+<!-- OPTION SWITCHER -->
+<div id="option-switcher">
+  <span class="opt-label">Layout</span>
+  <button data-option="A" class="active">Option A — Network Graph</button>
+  <button data-option="B">Option B — Timeline First</button>
+  <span class="opt-desc" id="opt-desc">Network is the primary view; click any node to explore relationships</span>
+</div>
+
+<!-- APP SHELL -->
+<div id="app-shell" data-option="A">
+
+  <!-- HEADER -->
+  <header id="app-header">
+    <div id="app-title">Bible <span>Knowledge</span> Map</div>
+    <div class="header-sep"></div>
+
+    <!-- Search -->
+    <div id="search-container">
+      <span id="search-icon">⌕</span>
+      <input id="search-input" type="text" placeholder="Search people, places, themes, prophecies…" autocomplete="off">
+      <div id="search-dropdown"></div>
+    </div>
+
+    <div class="header-sep"></div>
+
+    <!-- View controls -->
+    <div id="view-controls">
+      <button data-view="network" class="active">Network</button>
+      <button data-view="timeline">Timeline</button>
+      <button data-view="map">Map</button>
+    </div>
+
+    <div class="header-sep"></div>
+
+    <!-- Tool controls -->
+    <div id="tool-controls">
+      <button id="edge-label-btn" class="tool-btn active" title="Toggle relationship labels on edges">Edge Labels</button>
+      <button id="color-mode-btn" class="tool-btn" title="Color nodes by historical period instead of category">Period Color</button>
+    </div>
+
+    <!-- Mobile sidebar toggle -->
+    <button id="mobile-sidebar-toggle" style="margin-left:auto;padding:5px 10px;font-size:11px;border:1px solid var(--border);border-radius:3px;background:transparent;cursor:pointer;" onclick="document.getElementById('sidebar').classList.toggle('mobile-open')">Filters</button>
+  </header>
+
+  <!-- BODY -->
+  <div id="app-body">
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar"></aside>
+
+    <!-- MAIN VIEW -->
+    <main id="main-view">
+
+      <!-- NETWORK VIEW -->
+      <div id="network-view" style="position:relative;">
+        <div class="empty-hint" id="network-hint">
+          <div class="empty-hint-title">Drag nodes · Scroll to zoom · Click to explore</div>
+          <div class="empty-hint-sub">Use filters on the left to narrow the graph</div>
+        </div>
+      </div>
+
+      <!-- TIMELINE VIEW -->
+      <div id="timeline-view"></div>
+
+      <!-- MAP VIEW -->
+      <div id="map-view"></div>
+
+    </main>
+
+    <!-- DETAIL PANEL -->
+    <aside id="detail-panel"></aside>
+
+  </div><!-- /app-body -->
+</div><!-- /app-shell -->
+
+<script>
+// Bible Knowledge Map — Data Layer  (v2: +5 entities, relType on all edges)
+// ──────────────────────────────────────────────────────────────────────────
+
+const REL_TYPES = {
+  biographical: { label: 'Biographical', color: '#9A9080', dash: null,          desc: 'Life events, authorship, historical actions' },
+  geographic:   { label: 'Geographic',   color: '#4A8050', dash: null,          desc: 'Physical location and journey connections' },
+  typological:  { label: 'Typological',  color: '#B8922A', dash: '6,3',         desc: 'OT types and shadows pointing to NT realities' },
+  prophetic:    { label: 'Prophetic',    color: '#8A3A2A', dash: '2,4',         desc: 'Prophecy authorship and fulfillment' },
+  covenantal:   { label: 'Covenantal',   color: '#3A6A9A', dash: '10,3,2,3',   desc: 'Covenant making, mediation, and inheritance' }
+};
+
+const NODE_TYPES = {
+  person:   { color: '#2E5B8A', bg: '#E8EFF7', border: '#2E5B8A', label: 'Person',    abbr: 'P' },
+  place:    { color: '#3D7340', bg: '#EBF3EB', border: '#3D7340', label: 'Place',     abbr: 'L' },
+  event:    { color: '#8A5A1A', bg: '#F5EDDF', border: '#8A5A1A', label: 'Event',     abbr: 'E' },
+  theme:    { color: '#5A3A7A', bg: '#EFE8F5', border: '#5A3A7A', label: 'Theme',     abbr: 'T' },
+  prophecy: { color: '#7A2A3A', bg: '#F5E8EB', border: '#7A2A3A', label: 'Prophecy',  abbr: 'Φ' },
+  book:     { color: '#1A6B6B', bg: '#E3F2F2', border: '#1A6B6B', label: 'Book',      abbr: 'B' }
+};
+
+const PERIODS = [
+  { id: 'patriarchal',    label: 'Patriarchal Age',   years: 'c. 2000–1700 BC',  color: '#C8A87A' },
+  { id: 'mosaic',         label: 'Exodus & Sinai',    years: 'c. 1526–1406 BC',  color: '#A8B870' },
+  { id: 'kingdom',        label: 'United Kingdom',    years: 'c. 1050–930 BC',   color: '#7AB0B8' },
+  { id: 'divided',        label: 'Divided Kingdom',   years: 'c. 930–722 BC',    color: '#A87A98' },
+  { id: 'exile',          label: 'Babylonian Exile',  years: 'c. 722–538 BC',    color: '#8890A8' },
+  { id: 'restoration',    label: 'Restoration',       years: 'c. 538–400 BC',    color: '#90A870' },
+  { id: 'intertestament', label: 'Intertestamental',  years: 'c. 400–4 BC',      color: '#C8B888' },
+  { id: 'nt',             label: 'New Testament',     years: 'c. 4 BC–100 AD',   color: '#7A9AC8' }
+];
+
+const NODES = [
+  // ── PEOPLE ────────────────────────────────────────────────────────────────
+  {
+    id: 'abraham', label: 'Abraham', type: 'person', testament: 'OT', period: 'patriarchal',
+    summary: `Father of the Hebrew nation and all who believe. Recipient of the foundational covenant promising land, innumerable descendants, and blessing to all nations. His faith — counted as righteousness — becomes the paradigm of justification in Paul's theology.`,
+    passages: ['Gen 12:1–3', 'Gen 15:1–21', 'Gen 17:1–8', 'Rom 4:1–25', 'Heb 11:8–19'],
+    dates: 'c. 2000–1825 BC',
+    geo: 'Canaan / Mesopotamia'
+  },
+  {
+    id: 'moses', label: 'Moses', type: 'person', testament: 'OT', period: 'mosaic',
+    summary: `Prophet, lawgiver, and deliverer of Israel from Egyptian bondage. Mediator of the Sinai covenant; received the Torah at Horeb. Author of the Pentateuch and a type of Christ — the prophet greater than Moses foretold in Deuteronomy.`,
+    passages: ['Exod 3:1–15', 'Exod 20:1–17', 'Deut 18:15–19', 'Heb 3:1–6', 'John 5:46'],
+    dates: 'c. 1526–1406 BC',
+    geo: 'Egypt / Sinai / Moab'
+  },
+  {
+    id: 'david', label: 'David', type: 'person', testament: 'OT', period: 'kingdom',
+    summary: `Israel's greatest king, psalmist, and prophet. Recipient of the Davidic covenant promising an eternal throne and dynasty. His reign in Jerusalem becomes the template for messianic kingship throughout the prophets.`,
+    passages: ['1 Sam 16:13', '2 Sam 7:12–16', 'Ps 22', 'Ps 110', 'Matt 1:1', 'Acts 2:34–36'],
+    dates: 'c. 1040–970 BC',
+    geo: 'Jerusalem'
+  },
+  {
+    id: 'solomon', label: 'Solomon', type: 'person', testament: 'OT', period: 'kingdom',
+    summary: `Son of David and Israel's wisest king. Built the First Temple in Jerusalem as the permanent dwelling of YHWH's glory. Authored Proverbs, Ecclesiastes, and Song of Songs. His reign is the golden age of the united monarchy; his later apostasy foreshadows the kingdom's division and the need for a greater son of David.`,
+    passages: ['1 Kgs 3:5–14', '1 Kgs 6–8', '1 Kgs 10:1–9', 'Prov 1:1', 'Matt 12:42'],
+    dates: 'c. 970–930 BC',
+    geo: 'Jerusalem'
+  },
+  {
+    id: 'elijah', label: 'Elijah', type: 'person', testament: 'OT', period: 'divided',
+    summary: `Fiery prophet of the northern kingdom; confronted Ahab and Jezebel on Mount Carmel. Heard God in a still small voice at Horeb. Taken to heaven in a whirlwind (2 Kgs 2). Malachi 4:5–6 foretells his eschatological return, fulfilled typologically in John the Baptist and anticipated again at the eschaton.`,
+    passages: ['1 Kgs 17–18', '1 Kgs 19:9–18', '2 Kgs 2:11', 'Mal 4:5–6', 'Matt 17:10–13'],
+    dates: 'c. 875–850 BC',
+    geo: 'Northern Israel / Horeb'
+  },
+  {
+    id: 'isaiah', label: 'Isaiah', type: 'person', testament: 'OT', period: 'divided',
+    summary: `Major 8th-century prophet called the "evangelical prophet" for his extensive messianic predictions. Ministered under four Judean kings; his vision of YHWH's holiness shapes the whole book's theology. The Servant Songs (Isa 40–55) are foundational for NT Christology.`,
+    passages: ['Isa 6:1–13', 'Isa 7:14', 'Isa 9:6–7', 'Isa 53', 'Isa 61:1–3'],
+    dates: 'c. 740–681 BC',
+    geo: 'Jerusalem'
+  },
+  {
+    id: 'daniel', label: 'Daniel', type: 'person', testament: 'OT', period: 'exile',
+    summary: `Prophet and royal counselor in Babylon under Nebuchadnezzar and Darius. Maintained covenant faithfulness under imperial pressure. Received sweeping apocalyptic visions of world empires and the ultimate triumph of God's kingdom.`,
+    passages: ['Dan 1:1–8', 'Dan 2', 'Dan 7:13–14', 'Dan 9:24–27', 'Matt 24:15'],
+    dates: 'c. 620–535 BC',
+    geo: 'Babylon'
+  },
+  {
+    id: 'ezra', label: 'Ezra', type: 'person', testament: 'OT', period: 'restoration',
+    summary: `Priest and scribe who led a second wave of Jewish exiles from Babylon to Jerusalem c. 458 BC under Artaxerxes I. Restored Torah observance, dissolved foreign marriages, and publicly read the Law (Neh 8), renewing the covenant community. Credited with shaping the Hebrew canon's final form.`,
+    passages: ['Ezra 7:10', 'Ezra 9–10', 'Neh 8:1–8', 'Neh 9:38'],
+    dates: 'c. 480–440 BC',
+    geo: 'Babylon / Jerusalem'
+  },
+  {
+    id: 'esther', label: 'Esther', type: 'person', testament: 'OT', period: 'restoration',
+    summary: `Jewish queen of Persia under Ahasuerus (Xerxes I); cousin of Mordecai. Through courage and divine providence she preserved the Jewish people from Haman's genocide. Her story illustrates God's hidden sovereignty — his name is absent from the book — and Israel's survival in diaspora as the lineage of the coming Messiah.`,
+    passages: ['Esth 1–10', 'Esth 4:14', 'Esth 8:11–17'],
+    dates: 'c. 479 BC',
+    geo: 'Susa / Persia'
+  },
+  {
+    id: 'mary', label: 'Mary', type: 'person', testament: 'NT', period: 'nt',
+    summary: `Virgin mother of Jesus Christ; direct fulfillment of Isaiah 7:14. Her Magnificat echoes Hannah's song and shows her as the daughter of Zion. Honored in Christian tradition as Theotokos (God-bearer). Present at Cana, Calvary, and Pentecost.`,
+    passages: ['Luke 1:26–56', 'Matt 1:18–25', 'John 2:1–11', 'John 19:25–27', 'Acts 1:14'],
+    dates: 'c. 20 BC – 1st cent. AD',
+    geo: 'Nazareth / Jerusalem'
+  },
+  {
+    id: 'john_bpt', label: 'John the Baptist', type: 'person', testament: 'NT', period: 'nt',
+    summary: `Forerunner of Jesus Christ; the Elijah-figure foretold in Malachi 4. Proclaimed repentance and baptized in the Jordan, fulfilling Isaiah 40:3 ("a voice crying in the wilderness"). Declared Jesus "the Lamb of God who takes away the sin of the world" (John 1:29). Martyred by Herod Antipas.`,
+    passages: ['Matt 3', 'Luke 1:5–25', 'John 1:19–34', 'Isa 40:3', 'Matt 11:11–14'],
+    dates: 'c. 5 BC – 30 AD',
+    geo: 'Judean Wilderness / Jordan River'
+  },
+  {
+    id: 'peter', label: 'Peter', type: 'person', testament: 'NT', period: 'nt',
+    summary: `Fisherman-apostle and leader of the twelve. First to confess Jesus as Messiah at Caesarea Philippi. Denied Christ but was restored; preached the inaugural Pentecost sermon. Authored two epistles; martyred in Rome c. 67 AD.`,
+    passages: ['Matt 16:13–19', 'Acts 2:14–41', 'Acts 10', '1 Pet 1:1–12', 'John 21:15–19'],
+    dates: 'c. 1 BC – 67 AD',
+    geo: 'Galilee / Jerusalem / Rome'
+  },
+  {
+    id: 'paul', label: 'Paul', type: 'person', testament: 'NT', period: 'nt',
+    summary: `Apostle to the Gentiles; formerly Saul of Tarsus, a persecutor of the church. Author of thirteen epistles and theologian of grace, justification, and the universal body of Christ. Three missionary journeys; imprisoned in Rome c. 60–67 AD.`,
+    passages: ['Acts 9:1–19', 'Rom 1:16–17', 'Gal 2:20', 'Phil 3:4–14', '2 Tim 4:6–8'],
+    dates: 'c. 5–67 AD',
+    geo: 'Tarsus / Jerusalem / Rome'
+  },
+  {
+    id: 'jesus', label: 'Jesus', type: 'person', testament: 'both', period: 'nt',
+    summary: `Son of God and Son of Man; incarnate Word. Fulfillment of the Mosaic, Davidic, and prophetic covenants. Inaugurated the Kingdom of God, instituted the New Covenant in his blood, rose bodily from the dead, and ascended to the Father's right hand.`,
+    passages: ['Matt 1:1', 'Luke 4:18–21', 'John 1:1–14', 'John 3:16', 'Phil 2:6–11', 'Rev 22:13'],
+    dates: 'c. 4 BC – 30 AD',
+    geo: 'Nazareth / Jerusalem'
+  },
+
+  // ── PLACES ────────────────────────────────────────────────────────────────
+  {
+    id: 'jerusalem', label: 'Jerusalem', type: 'place', testament: 'both', period: 'kingdom',
+    summary: `The Holy City; David's capital and site of the Temple. Theological center of Israel's worship and the locus of Christ's crucifixion, resurrection, and the Spirit's outpouring. In eschatology, the New Jerusalem descends from heaven as God's dwelling with humanity.`,
+    passages: ['2 Sam 5:6–10', 'Ps 48', 'Isa 2:1–4', 'Luke 19:41–44', 'Rev 21:1–4'],
+    dates: 'c. 3500 BC – present',
+    geo: { x: 579, y: 337 }
+  },
+  {
+    id: 'babylon', label: 'Babylon', type: 'place', testament: 'both', period: 'exile',
+    summary: `Ancient capital of the Babylonian Empire; site of Israel's exile (605–538 BC). Nebuchadnezzar destroyed Jerusalem and the Temple in 586 BC. In Revelation, "Babylon" symbolizes any earthly power that opposes God and persecutes his people.`,
+    passages: ['2 Kgs 24–25', 'Ps 137', 'Isa 47', 'Dan 1–6', 'Rev 17–18'],
+    dates: 'c. 2300 BC – 539 BC (Persian conquest)',
+    geo: { x: 755, y: 321 }
+  },
+  {
+    id: 'egypt', label: 'Egypt', type: 'place', testament: 'OT', period: 'mosaic',
+    summary: `Land of Israel's bondage and miraculous Exodus deliverance. Theological type of sin and oppression from which God redeems his people. Joseph preserved his family there; the infant Jesus was taken there in fulfillment of Hosea 11:1.`,
+    passages: ['Gen 12:10', 'Exod 1', 'Exod 12', 'Hos 11:1', 'Matt 2:13–15'],
+    dates: 'c. 3100 BC – present',
+    geo: { x: 502, y: 373 }
+  },
+  {
+    id: 'nazareth', label: 'Nazareth', type: 'place', testament: 'NT', period: 'nt',
+    summary: `Small Galilean town where Jesus grew up. Considered provincial ("Can anything good come from Nazareth?"). Jesus's return there to read Isaiah 61 in the synagogue marks the programmatic announcement of his ministry.`,
+    passages: ['Matt 2:23', 'Luke 4:16–30', 'John 1:45–46'],
+    dates: 'c. 2nd cent. BC – present',
+    geo: { x: 580, y: 318 }
+  },
+  {
+    id: 'rome', label: 'Rome', type: 'place', testament: 'NT', period: 'nt',
+    summary: `Capital of the Roman Empire; hub of early Christian mission and Paul's letter-writing ministry. Both Peter and Paul were martyred here c. 67 AD. In Revelation, imperial Rome is the "Babylon" persecuting the saints.`,
+    passages: ['Acts 28:14–31', 'Rom 1:7', 'Phil 4:22', 'Rev 13'],
+    dates: 'c. 753 BC – present',
+    geo: { x: 143, y: 127 }
+  },
+
+  // ── EVENTS ────────────────────────────────────────────────────────────────
+  {
+    id: 'exodus_ev', label: 'The Exodus', type: 'event', testament: 'OT', period: 'mosaic',
+    summary: `Israel's deliverance from Egyptian slavery through plagues, the Passover, and the parting of the Red Sea. The paradigmatic act of divine redemption in the OT; Paul reads the wilderness as typology for the Christian life; Luke 9:31 calls the crucifixion Jesus's "exodus."`,
+    passages: ['Exod 1–15', 'Ps 105–106', 'Isa 43:16–21', 'Luke 9:31', '1 Cor 10:1–13'],
+    dates: 'c. 1446 BC (early date) or 1270 BC (late date)'
+  },
+  {
+    id: 'exile_ev', label: 'Babylonian Exile', type: 'event', testament: 'OT', period: 'exile',
+    summary: `The deportation of Judah to Babylon under Nebuchadnezzar (605–586 BC) as covenantal judgment. The destruction of the Temple created a theological crisis that shaped canonical prophecy, Psalms, and Wisdom literature. The return under Cyrus becomes a type of eschatological redemption.`,
+    passages: ['2 Kgs 24–25', 'Jer 29', 'Ps 137', 'Ezek 37', 'Dan 9:1–19'],
+    dates: '605–538 BC'
+  },
+  {
+    id: 'resurrection_ev', label: 'The Resurrection', type: 'event', testament: 'NT', period: 'nt',
+    summary: `The bodily resurrection of Jesus Christ on the third day after the crucifixion. Central fact of the apostolic proclamation (kerygma). Paul in 1 Cor 15 grounds all Christian hope in this historical event: if Christ is not raised, faith is futile.`,
+    passages: ['Matt 28', 'Luke 24', 'John 20–21', '1 Cor 15:1–58', 'Acts 2:24–36'],
+    dates: 'c. 30 AD'
+  },
+  {
+    id: 'pentecost_ev', label: 'Pentecost', type: 'event', testament: 'NT', period: 'nt',
+    summary: `Outpouring of the Holy Spirit on the disciples in Jerusalem fifty days after the Resurrection. Peter interprets it as the fulfillment of Joel 2:28–32. It marks the birth of the church and the reversal of Babel's division of peoples.`,
+    passages: ['Acts 2:1–41', 'Joel 2:28–32', 'John 14:16–17', 'Eph 1:13–14'],
+    dates: 'c. 30 AD'
+  },
+
+  // ── THEMES ────────────────────────────────────────────────────────────────
+  {
+    id: 'kingdom', label: 'Kingdom of God', type: 'theme', testament: 'both', period: null,
+    summary: `God's sovereign rule over creation, covenant community, and ultimately all nations. Anticipated in Eden, promised to David, proclaimed by the prophets, and inaugurated in Jesus's ministry, death, and resurrection. Its consummation is the New Jerusalem.`,
+    passages: ['Gen 1:26–28', '2 Sam 7:12–16', 'Dan 7:13–14', 'Mark 1:15', 'Rev 11:15'],
+    dates: 'Entire canon'
+  },
+  {
+    id: 'messiah', label: 'Messiah', type: 'theme', testament: 'both', period: null,
+    summary: `"Anointed One" (Hebrew mashiach; Greek christos). The promised deliverer-king anticipated across the OT — seed of Abraham, son of David, Suffering Servant — and identified with Jesus of Nazareth in the NT proclamation.`,
+    passages: ['Gen 3:15', 'Ps 2', 'Isa 9:6–7', 'Dan 9:25–26', 'Matt 16:16', 'Acts 2:36'],
+    dates: 'Entire canon'
+  },
+  {
+    id: 'resurrection_th', label: 'Resurrection', type: 'theme', testament: 'both', period: null,
+    summary: `Bodily restoration from death. Rooted in creation theology (God as life-giver); anticipated in OT (Job 19, Isa 26, Dan 12); definitively fulfilled in Christ; promised to all who are united to him.`,
+    passages: ['Job 19:25–27', 'Isa 26:19', 'Dan 12:2', 'John 5:28–29', '1 Cor 15:20–28', 'Rev 20:11–15'],
+    dates: 'Entire canon'
+  },
+  {
+    id: 'new_covenant', label: 'New Covenant', type: 'theme', testament: 'both', period: null,
+    summary: `Promised in Jeremiah 31 as superior to the Mosaic covenant: God will write his law on hearts, forgive sins definitively, and give universal knowledge of YHWH by his Spirit. Inaugurated by Jesus at the Last Supper; expounded in Hebrews 8–10.`,
+    passages: ['Jer 31:31–34', 'Ezek 36:26–27', 'Luke 22:20', 'Heb 8:6–13', 'Heb 12:24'],
+    dates: 'c. 600 BC (prophecy) / 30 AD (inauguration)'
+  },
+  {
+    id: 'covenant', label: 'Covenant', type: 'theme', testament: 'both', period: null,
+    summary: `The binding relational framework between God and his people. Successive covenants — Noahic, Abrahamic, Mosaic, Davidic, New — form the progressive structure of biblical revelation, each building toward the eternal covenant in Christ.`,
+    passages: ['Gen 9:9–17', 'Gen 15', 'Exod 24', '2 Sam 7', 'Luke 22:20', 'Rev 21:3'],
+    dates: 'Entire canon'
+  },
+
+  // ── PROPHECIES ────────────────────────────────────────────────────────────
+  {
+    id: 'isa53', label: 'Isaiah 53', type: 'prophecy', testament: 'OT', period: 'divided',
+    summary: `The fourth Servant Song: the Servant of YHWH bears the transgressions of many, is "wounded for our iniquities," silent before his accusers, and buried with the rich. The Ethiopian eunuch (Acts 8) asks Philip about this text, which Philip applies to Jesus.`,
+    passages: ['Isa 52:13–53:12', 'Acts 8:30–35', 'Rom 5:6–8', '1 Pet 2:22–25'],
+    dates: 'c. 700 BC (prophecy) / 30 AD (fulfillment)'
+  },
+  {
+    id: 'isa714', label: 'Isaiah 7:14', type: 'prophecy', testament: 'OT', period: 'divided',
+    summary: `"Behold, the virgin shall conceive and bear a son, and shall call his name Immanuel" — God with us. Addressed to Ahaz in a political crisis; Matthew sees it fulfilled in the virginal conception of Jesus, the definitive "God with us."`,
+    passages: ['Isa 7:14', 'Matt 1:22–23', 'Luke 1:31–35'],
+    dates: 'c. 735 BC (prophecy) / c. 4 BC (fulfillment)'
+  },
+  {
+    id: 'dan9', label: "Daniel's 70 Weeks", type: 'prophecy', testament: 'OT', period: 'exile',
+    summary: `Gabriel's prophecy of 70 "sevens" (490 years) culminating in the Messiah's "cutting off," the destruction of Jerusalem, and the ultimate establishment of everlasting righteousness. Jesus cites the "abomination of desolation" (Dan 9:27) in his Olivet Discourse.`,
+    passages: ['Dan 9:24–27', 'Matt 24:15', 'Luke 19:41–44'],
+    dates: 'c. 538 BC (prophecy)'
+  },
+  {
+    id: 'ps22', label: 'Psalm 22', type: 'prophecy', testament: 'OT', period: 'kingdom',
+    summary: `David's lament of abandonment ("My God, my God, why have you forsaken me?") describes scorn, encirclement, pierced hands and feet, divided garments, and bones out of joint — each detail echoed in the Gospel crucifixion narratives.`,
+    passages: ['Ps 22:1–31', 'Matt 27:35–46', 'John 19:23–24', 'Heb 2:12'],
+    dates: 'c. 1000 BC (written) / 30 AD (fulfillment)'
+  },
+
+  // ── BOOKS ─────────────────────────────────────────────────────────────────
+  {
+    id: 'genesis', label: 'Genesis', type: 'book', testament: 'OT', period: 'patriarchal',
+    summary: `"In the beginning." Book of origins: creation, fall, flood, Table of Nations, and the patriarchal narratives (Abraham, Isaac, Jacob, Joseph). Establishes the Abrahamic covenant, the line of promise, and the seed who will crush the serpent.`,
+    passages: ['Gen 1:1', 'Gen 3:15', 'Gen 12:1–3', 'Gen 50:20'],
+    dates: 'Covers creation – c. 1700 BC; composed c. 1446–1406 BC'
+  },
+  {
+    id: 'exodus_bk', label: 'Exodus', type: 'book', testament: 'OT', period: 'mosaic',
+    summary: `Deliverance from Egypt, the Sinai covenant, the giving of the Law, the Tabernacle construction. "I am YHWH your God who brought you out of Egypt" becomes the covenantal identity formula underlying all subsequent Scripture.`,
+    passages: ['Exod 3:14', 'Exod 12:12–13', 'Exod 20:2–17', 'Exod 40:34–38'],
+    dates: 'Covers c. 1526–1440 BC; composed c. 1446 BC'
+  },
+  {
+    id: 'isaiah_bk', label: 'Isaiah', type: 'book', testament: 'OT', period: 'divided',
+    summary: `The "Fifth Gospel" or "NT in miniature." 66 chapters moving from judgment (1–39) to comfort and salvation (40–66). Contains the Servant Songs, the vision of the new creation, and more NT quotations than any other OT book.`,
+    passages: ['Isa 1:18', 'Isa 6:3', 'Isa 53', 'Isa 61:1–3', 'Isa 65:17'],
+    dates: 'Composed c. 740–681 BC'
+  },
+  {
+    id: 'daniel_bk', label: 'Daniel', type: 'book', testament: 'OT', period: 'exile',
+    summary: `Court narratives and apocalyptic visions. The statue of world empires (Dan 2), the four beasts (Dan 7), the Son of Man receiving the eternal kingdom, and the 70 Weeks prophecy (Dan 9) are foundational texts for both Jewish and Christian eschatology.`,
+    passages: ['Dan 2:44', 'Dan 3:17–18', 'Dan 7:13–14', 'Dan 9:24–27', 'Dan 12:2–3'],
+    dates: 'Composed c. 535 BC'
+  },
+  {
+    id: 'matthew_bk', label: 'Matthew', type: 'book', testament: 'NT', period: 'nt',
+    summary: `Gospel written to demonstrate Jesus as the fulfillment of OT promises: Messiah, Son of David, New Moses. Five great discourses structure the book; Matthew's formula "this was to fulfill what was written by the prophet" occurs ten times.`,
+    passages: ['Matt 1:1', 'Matt 5:17', 'Matt 16:16–18', 'Matt 28:18–20'],
+    dates: 'Composed c. 60–85 AD'
+  },
+  {
+    id: 'acts_bk', label: 'Acts', type: 'book', testament: 'NT', period: 'nt',
+    summary: `History of the early church from Jerusalem to Rome — "to the ends of the earth" (Acts 1:8). Luke traces the Spirit-empowered expansion of the gospel through Peter, Stephen, Philip, and Paul. The book ends with Paul in Rome, proclaiming unhindered.`,
+    passages: ['Acts 1:8', 'Acts 2:1–41', 'Acts 9:1–19', 'Acts 28:30–31'],
+    dates: 'Composed c. 63 AD'
+  },
+  {
+    id: 'romans_bk', label: 'Romans', type: 'book', testament: 'NT', period: 'nt',
+    summary: `Paul's theological magnum opus: the righteousness of God revealed in the gospel, universal sinfulness, justification by faith, life in the Spirit, suffering and hope, Israel's redemption, and the ethics of the new community. The Reformation turned on Romans 1:16–17.`,
+    passages: ['Rom 1:16–17', 'Rom 3:21–26', 'Rom 5:1–11', 'Rom 8:1–39', 'Rom 11'],
+    dates: 'Composed c. 57 AD, from Corinth'
+  },
+  {
+    id: 'revelation_bk', label: 'Revelation', type: 'book', testament: 'NT', period: 'nt',
+    summary: `Apocalyptic vision to the seven churches of Asia under Domitian. Christ's ultimate triumph over dragon, beast, and Babylon; the judgment of the dead; the marriage of the Lamb; the New Jerusalem descending — God tabernacling with humanity forever.`,
+    passages: ['Rev 1:1–8', 'Rev 5', 'Rev 12', 'Rev 17–18', 'Rev 21–22'],
+    dates: 'Composed c. 95 AD'
+  },
+
+  // ── NEW EVENTS ────────────────────────────────────────────────────────────
+  {
+    id: 'fall_ev', label: 'Fall of Man', type: 'event', testament: 'OT', period: 'patriarchal',
+    summary: `The primordial rebellion of Adam and Eve in Eden, eating the forbidden fruit at the serpent's instigation. Introduces sin, death, and alienation from God into human existence — the problem the entire Bible moves to resolve. Genesis 3:15, spoken over the serpent, plants the first seed of gospel hope.`,
+    passages: ['Gen 3:1–24', 'Rom 5:12–21', 'Rom 8:19–22', '1 Cor 15:21–22'],
+    dates: 'Primordial history'
+  },
+  {
+    id: 'passover_ev', label: 'The Passover', type: 'event', testament: 'OT', period: 'mosaic',
+    summary: `The night YHWH struck Egypt's firstborn and passed over Israelite homes marked by lamb's blood on the doorposts. The founding redemptive ritual of Israel, celebrated annually. Paul declares "Christ our Passover has been sacrificed" (1 Cor 5:7), making the Passover lamb the primary OT type of the atonement.`,
+    passages: ['Exod 12:1–28', 'Lev 23:4–8', '1 Cor 5:7', 'John 1:29', 'Heb 11:28'],
+    dates: 'c. 1446 BC (first observance)'
+  },
+  {
+    id: 'crucifixion', label: 'The Crucifixion', type: 'event', testament: 'NT', period: 'nt',
+    summary: `The execution of Jesus Christ by Roman crucifixion outside Jerusalem, c. 30 AD. The central redemptive act of all Scripture: the sinless Son of God bearing humanity's sin and God's wrath, purchasing forgiveness and reconciliation. Every Passover, every burnt offering, every Servant Song in Isaiah converges here.`,
+    passages: ['Matt 27:32–56', 'John 19:17–37', 'Isa 53:4–6', 'Rom 3:25', 'Heb 9:28'],
+    dates: 'c. 30 AD (Passover, Nisan 14)'
+  },
+  {
+    id: 'last_supper', label: 'Last Supper', type: 'event', testament: 'NT', period: 'nt',
+    summary: `The final Passover meal Jesus shared with his disciples the night before his crucifixion. Jesus reinterpreted the Passover elements — bread as his body broken, cup as his blood of the New Covenant. Instituted the Lord's Supper as the ongoing memorial of the New Covenant, fulfilling Jeremiah 31:31–34.`,
+    passages: ['Matt 26:17–29', 'Luke 22:14–23', '1 Cor 11:23–26', 'Jer 31:31–34'],
+    dates: 'c. 30 AD, Nisan 13–14'
+  },
+  {
+    id: 'ascension', label: 'Ascension', type: 'event', testament: 'NT', period: 'nt',
+    summary: `The bodily exaltation of the risen Christ to the Father's right hand forty days after the Resurrection. Fulfills Psalm 110:1 and Daniel 7:13–14. Jesus enters heaven as humanity's high priest and reigning king, interceding for his people and ruling until all enemies are placed beneath his feet.`,
+    passages: ['Acts 1:9–11', 'Luke 24:50–53', 'Ps 110:1', 'Dan 7:13', 'Heb 4:14–16', 'Eph 4:8–10'],
+    dates: 'c. 30 AD (forty days post-Resurrection)'
+  },
+
+  // ── NEW PLACES ────────────────────────────────────────────────────────────
+  {
+    id: 'sinai', label: 'Sinai / Horeb', type: 'place', testament: 'OT', period: 'mosaic',
+    summary: `The mountain of God in the Sinai Peninsula — called Sinai in the Pentateuch, Horeb in Deuteronomy and the Prophets. Site of the Mosaic covenant, the giving of the Law, and the Tabernacle blueprints. Elijah fled here after Carmel. Its geography of desolation makes God's revelation there all the more arresting.`,
+    passages: ['Exod 19–20', 'Exod 24:12–18', '1 Kgs 19:8–13', 'Gal 4:24–25', 'Heb 12:18–21'],
+    dates: 'c. 1446 BC (Mosaic covenant)',
+    geo: { x: 555, y: 392 }
+  },
+  {
+    id: 'bethlehem', label: 'Bethlehem', type: 'place', testament: 'both', period: 'kingdom',
+    summary: `Small town in Judah, six miles south of Jerusalem. City of David and birthplace of Jesus Christ — fulfilling Micah 5:2. The convergence of David and Jesus at Bethlehem signals the continuity of the Davidic covenant and its fulfillment in the one born "ruler in Israel, whose coming forth is from of old."`,
+    passages: ['Ruth 1:22', '1 Sam 16:1–13', 'Mic 5:2', 'Matt 2:1–6', 'Luke 2:4–7'],
+    dates: 'Ancient; c. 1000 BC (David) / c. 4 BC (Jesus)',
+    geo: { x: 593, y: 346 }
+  },
+  {
+    id: 'canaan', label: 'Canaan', type: 'place', testament: 'OT', period: 'patriarchal',
+    summary: `The Promised Land — the territory between the Jordan River and the Mediterranean, given to Abraham's descendants by divine covenant. Its conquest under Joshua fulfills the Abrahamic promise. In the NT the land promise is typologically expanded to encompass the whole earth (Rom 4:13).`,
+    passages: ['Gen 12:7', 'Gen 15:18–21', 'Josh 1:1–9', 'Heb 11:8–10', 'Rom 4:13'],
+    dates: 'c. 2000 BC (promised) / c. 1406–1380 BC (conquered)',
+    geo: { x: 564, y: 300 }
+  },
+  {
+    id: 'galilee', label: 'Galilee', type: 'place', testament: 'NT', period: 'nt',
+    summary: `Northern region of ancient Israel; site of most of Jesus's public ministry. Called "Galilee of the Gentiles" (Isa 9:1). Jesus called his disciples here, performed most of his miracles, and delivered the Sermon on the Mount. The risen Christ appeared to his disciples in Galilee.`,
+    passages: ['Isa 9:1–2', 'Matt 4:12–17', 'Mark 1:14–20', 'John 21:1', 'Matt 28:16'],
+    dates: 'c. 1st cent. AD',
+    geo: { x: 570, y: 311 }
+  },
+
+  // ── NEW PROPHECIES ────────────────────────────────────────────────────────
+  {
+    id: 'gen315', label: 'Genesis 3:15', type: 'prophecy', testament: 'OT', period: 'patriarchal',
+    summary: `The protoevangelium — the first gospel. God speaks to the serpent: "I will put enmity between you and the woman, and between your offspring and her offspring; he shall bruise your head, and you shall bruise his heel." The entire canon unfolds this conflict and its resolution in Christ (Rom 16:20).`,
+    passages: ['Gen 3:15', 'Rom 16:20', 'Rev 12:9', 'Rev 20:10', 'Heb 2:14'],
+    dates: 'Primordial; fulfilled c. 30 AD'
+  },
+  {
+    id: 'mic52', label: 'Micah 5:2', type: 'prophecy', testament: 'OT', period: 'divided',
+    summary: `"But you, O Bethlehem Ephrathah, who are too little to be among the clans of Judah, from you shall come forth for me one who is to be ruler in Israel, whose coming forth is from of old, from ancient days." Cited by the chief priests when Herod asks where the Christ is to be born (Matt 2:4–6).`,
+    passages: ['Mic 5:2', 'Matt 2:4–6', 'John 7:42'],
+    dates: 'c. 700 BC (prophecy) / c. 4 BC (fulfillment)'
+  },
+  {
+    id: 'ps16', label: 'Psalm 16', type: 'prophecy', testament: 'OT', period: 'kingdom',
+    summary: `David's psalm of trust: "You will not abandon my soul to Sheol, or let your holy one see corruption." Peter (Acts 2) and Paul (Acts 13) cite this as fulfilled in Christ's bodily resurrection — since David himself died and was buried, he must have spoken of his greater Son.`,
+    passages: ['Ps 16:8–11', 'Acts 2:25–32', 'Acts 13:34–37'],
+    dates: 'c. 1000 BC (written) / 30 AD (fulfillment)'
+  },
+  {
+    id: 'ps110', label: 'Psalm 110', type: 'prophecy', testament: 'OT', period: 'kingdom',
+    summary: `"The LORD said to my Lord: Sit at my right hand, until I make your enemies your footstool." The most frequently quoted OT passage in the NT. Jesus uses it to challenge the Pharisees (Matt 22:41–46). The second verse links the Messiah to the priestly order of Melchizedek — foundational to Hebrews' argument.`,
+    passages: ['Ps 110:1–4', 'Matt 22:41–46', 'Acts 2:34–36', 'Heb 7:1–28'],
+    dates: 'c. 1000 BC (written) / 30 AD (fulfillment)'
+  },
+  {
+    id: 'zech99', label: 'Zechariah 9:9', type: 'prophecy', testament: 'OT', period: 'restoration',
+    summary: `"Rejoice greatly, O daughter of Zion! Behold, your king is coming to you; righteous and having salvation is he, humble and mounted on a donkey." Matthew and John explicitly cite this as fulfilled in the Triumphal Entry of Jesus into Jerusalem on Palm Sunday, the week before his crucifixion.`,
+    passages: ['Zech 9:9', 'Matt 21:1–11', 'John 12:12–16'],
+    dates: 'c. 520 BC (prophecy) / 30 AD (fulfillment)'
+  },
+
+  // ── NEW THEMES ────────────────────────────────────────────────────────────
+  {
+    id: 'atonement', label: 'Atonement', type: 'theme', testament: 'both', period: null,
+    summary: `The reconciliation of sinful humanity to a holy God through substitutionary sacrifice. Prefigured in the Mosaic sacrificial system (Lev 16, Day of Atonement), the Passover lamb, and Isaiah's Suffering Servant. Definitively achieved in Christ's cross; expounded in Romans 3:25 and Hebrews 9–10.`,
+    passages: ['Lev 16', 'Isa 53:4–6', 'Rom 3:25', 'Heb 9:12–14', '1 John 2:2'],
+    dates: 'Entire canon'
+  },
+  {
+    id: 'temple_presence', label: 'Temple & Presence', type: 'theme', testament: 'both', period: null,
+    summary: `The arc of God's dwelling with humanity: Eden → Tabernacle → Solomonic Temple → Exile → Christ ("the Word tabernacled among us") → the indwelling Spirit → the New Jerusalem where God himself is the Temple. Ezekiel's vision of the Glory departing and returning structures the whole arc.`,
+    passages: ['Exod 40:34–38', '1 Kgs 8:10–11', 'Ezek 10', 'Ezek 43:1–5', 'John 1:14', 'Rev 21:22'],
+    dates: 'Entire canon'
+  },
+  {
+    id: 'holy_spirit', label: 'Holy Spirit', type: 'theme', testament: 'both', period: null,
+    summary: `The third person of the Trinity; agent of creation, prophecy, empowerment, and renewal. Promised by the prophets as the power of the New Covenant (Jer 31, Ezek 36, Joel 2). Came upon Jesus at baptism; poured out at Pentecost; indwells all believers — the "down payment" of eschatological salvation (Eph 1:13–14).`,
+    passages: ['Gen 1:2', 'Isa 61:1', 'Ezek 36:26–27', 'John 16:7–15', 'Acts 2:1–4', 'Eph 1:13–14'],
+    dates: 'Entire canon'
+  }
+];
+
+const EDGES = [
+  // ── People → Places ───────────────────────────────────────────────────────
+  { id: 'e1',  relType: 'geographic',   source: 'abraham',        target: 'egypt',           label: 'sojourned in' },
+  { id: 'e2',  relType: 'geographic',   source: 'moses',          target: 'egypt',           label: 'delivered from' },
+  { id: 'e3',  relType: 'geographic',   source: 'david',          target: 'jerusalem',       label: 'ruled from' },
+  { id: 'e4',  relType: 'geographic',   source: 'isaiah',         target: 'jerusalem',       label: 'prophesied in' },
+  { id: 'e5',  relType: 'geographic',   source: 'daniel',         target: 'babylon',         label: 'exiled to' },
+  { id: 'e6',  relType: 'geographic',   source: 'mary',           target: 'nazareth',        label: 'lived in' },
+  { id: 'e7',  relType: 'geographic',   source: 'jesus',          target: 'nazareth',        label: 'raised in' },
+  { id: 'e8',  relType: 'geographic',   source: 'jesus',          target: 'jerusalem',       label: 'died in' },
+  { id: 'e9',  relType: 'geographic',   source: 'peter',          target: 'rome',            label: 'martyred in' },
+  { id: 'e10', relType: 'geographic',   source: 'paul',           target: 'rome',            label: 'imprisoned in' },
+  // ── People → Events ───────────────────────────────────────────────────────
+  { id: 'e11', relType: 'biographical', source: 'moses',          target: 'exodus_ev',       label: 'led' },
+  { id: 'e12', relType: 'biographical', source: 'daniel',         target: 'exile_ev',        label: 'witness of' },
+  { id: 'e13', relType: 'biographical', source: 'jesus',          target: 'resurrection_ev', label: 'subject of' },
+  { id: 'e14', relType: 'biographical', source: 'peter',          target: 'pentecost_ev',    label: 'preached at' },
+  // ── People → Themes ───────────────────────────────────────────────────────
+  { id: 'e15', relType: 'covenantal',   source: 'abraham',        target: 'covenant',        label: 'received' },
+  { id: 'e16', relType: 'covenantal',   source: 'moses',          target: 'covenant',        label: 'mediated' },
+  { id: 'e17', relType: 'typological',  source: 'david',          target: 'messiah',         label: 'foreshadows' },
+  { id: 'e18', relType: 'prophetic',    source: 'isaiah',         target: 'messiah',         label: 'prophesied' },
+  { id: 'e19', relType: 'biographical', source: 'jesus',          target: 'messiah',         label: 'is' },
+  { id: 'e20', relType: 'covenantal',   source: 'jesus',          target: 'kingdom',         label: 'inaugurated' },
+  { id: 'e21', relType: 'covenantal',   source: 'jesus',          target: 'new_covenant',    label: 'instituted' },
+  { id: 'e22', relType: 'typological',  source: 'jesus',          target: 'resurrection_th', label: 'embodies' },
+  { id: 'e23', relType: 'covenantal',   source: 'paul',           target: 'new_covenant',    label: 'expounded' },
+  // ── People → Prophecies ───────────────────────────────────────────────────
+  { id: 'e24', relType: 'biographical', source: 'isaiah',         target: 'isa53',           label: 'authored' },
+  { id: 'e25', relType: 'biographical', source: 'isaiah',         target: 'isa714',          label: 'authored' },
+  { id: 'e26', relType: 'biographical', source: 'daniel',         target: 'dan9',            label: 'authored' },
+  { id: 'e27', relType: 'biographical', source: 'david',          target: 'ps22',            label: 'authored' },
+  { id: 'e28', relType: 'prophetic',    source: 'jesus',          target: 'isa53',           label: 'fulfilled' },
+  { id: 'e29', relType: 'prophetic',    source: 'jesus',          target: 'isa714',          label: 'fulfilled' },
+  { id: 'e30', relType: 'prophetic',    source: 'mary',           target: 'isa714',          label: 'fulfills' },
+  { id: 'e31', relType: 'prophetic',    source: 'jesus',          target: 'ps22',            label: 'fulfilled' },
+  // ── People → Books ────────────────────────────────────────────────────────
+  { id: 'e32', relType: 'biographical', source: 'moses',          target: 'genesis',         label: 'authored' },
+  { id: 'e33', relType: 'biographical', source: 'moses',          target: 'exodus_bk',       label: 'authored' },
+  { id: 'e34', relType: 'biographical', source: 'isaiah',         target: 'isaiah_bk',       label: 'authored' },
+  { id: 'e35', relType: 'biographical', source: 'daniel',         target: 'daniel_bk',       label: 'authored' },
+  { id: 'e36', relType: 'biographical', source: 'paul',           target: 'romans_bk',       label: 'authored' },
+  // ── Events → Places ───────────────────────────────────────────────────────
+  { id: 'e37', relType: 'geographic',   source: 'exodus_ev',      target: 'egypt',           label: 'departed from' },
+  { id: 'e38', relType: 'geographic',   source: 'exile_ev',       target: 'babylon',         label: 'occurred in' },
+  { id: 'e39', relType: 'geographic',   source: 'exile_ev',       target: 'jerusalem',       label: 'departed from' },
+  { id: 'e40', relType: 'geographic',   source: 'resurrection_ev',target: 'jerusalem',       label: 'occurred in' },
+  { id: 'e41', relType: 'geographic',   source: 'pentecost_ev',   target: 'jerusalem',       label: 'occurred in' },
+  // ── Events → Themes ───────────────────────────────────────────────────────
+  { id: 'e42', relType: 'covenantal',   source: 'exodus_ev',      target: 'covenant',        label: 'established' },
+  { id: 'e43', relType: 'typological',  source: 'exodus_ev',      target: 'messiah',         label: 'foreshadows' },
+  { id: 'e44', relType: 'typological',  source: 'resurrection_ev',target: 'resurrection_th', label: 'inaugurated' },
+  { id: 'e45', relType: 'covenantal',   source: 'resurrection_ev',target: 'new_covenant',    label: 'sealed' },
+  { id: 'e46', relType: 'covenantal',   source: 'pentecost_ev',   target: 'kingdom',         label: 'advanced' },
+  { id: 'e47', relType: 'covenantal',   source: 'exile_ev',       target: 'covenant',        label: 'judgment on' },
+  // ── Books → Prophecies ────────────────────────────────────────────────────
+  { id: 'e48', relType: 'biographical', source: 'isaiah_bk',      target: 'isa53',           label: 'contains' },
+  { id: 'e49', relType: 'biographical', source: 'isaiah_bk',      target: 'isa714',          label: 'contains' },
+  { id: 'e50', relType: 'biographical', source: 'daniel_bk',      target: 'dan9',            label: 'contains' },
+  // ── Theme ↔ Theme ─────────────────────────────────────────────────────────
+  { id: 'e51', relType: 'covenantal',   source: 'covenant',       target: 'new_covenant',    label: 'culminates in' },
+  { id: 'e52', relType: 'covenantal',   source: 'messiah',        target: 'kingdom',         label: 'brings' },
+  { id: 'e53', relType: 'covenantal',   source: 'new_covenant',   target: 'resurrection_th', label: 'promises' },
+  // ── Books → Places ────────────────────────────────────────────────────────
+  { id: 'e54', relType: 'geographic',   source: 'daniel_bk',      target: 'babylon',         label: 'set in' },
+  { id: 'e55', relType: 'geographic',   source: 'romans_bk',      target: 'rome',            label: 'addressed to' },
+  { id: 'e56', relType: 'geographic',   source: 'acts_bk',        target: 'rome',            label: 'concludes in' },
+  { id: 'e57', relType: 'typological',  source: 'revelation_bk',  target: 'babylon',         label: 'symbolizes' },
+  { id: 'e58', relType: 'prophetic',    source: 'revelation_bk',  target: 'jerusalem',       label: 'culminates in' },
+  { id: 'e59', relType: 'geographic',   source: 'genesis',        target: 'egypt',           label: 'introduces' },
+  { id: 'e60', relType: 'geographic',   source: 'matthew_bk',     target: 'nazareth',        label: 'references' },
+
+  // ── Solomon ───────────────────────────────────────────────────────────────
+  { id: 'e61', relType: 'biographical', source: 'david',          target: 'solomon',         label: 'father of' },
+  { id: 'e62', relType: 'geographic',   source: 'solomon',        target: 'jerusalem',       label: 'built Temple in' },
+  { id: 'e63', relType: 'covenantal',   source: 'solomon',        target: 'kingdom',         label: 'exemplified' },
+  { id: 'e64', relType: 'covenantal',   source: 'solomon',        target: 'covenant',        label: 'inherited' },
+  { id: 'e65', relType: 'typological',  source: 'solomon',        target: 'messiah',         label: 'type of' },
+  // ── Elijah ────────────────────────────────────────────────────────────────
+  { id: 'e66', relType: 'biographical', source: 'elijah',         target: 'kingdom',         label: 'defended' },
+  { id: 'e67', relType: 'typological',  source: 'elijah',         target: 'messiah',         label: 'forerunner type' },
+  { id: 'e68', relType: 'typological',  source: 'elijah',         target: 'john_bpt',        label: 'type of' },
+  // ── John the Baptist ──────────────────────────────────────────────────────
+  { id: 'e69', relType: 'biographical', source: 'john_bpt',       target: 'jesus',           label: 'baptized' },
+  { id: 'e70', relType: 'prophetic',    source: 'john_bpt',       target: 'messiah',         label: 'heralded' },
+  { id: 'e71', relType: 'prophetic',    source: 'john_bpt',       target: 'kingdom',         label: 'proclaimed' },
+  { id: 'e72', relType: 'typological',  source: 'john_bpt',       target: 'elijah',          label: 'fulfills type of' },
+  { id: 'e73', relType: 'covenantal',   source: 'john_bpt',       target: 'new_covenant',    label: 'announced' },
+  { id: 'e74', relType: 'prophetic',    source: 'john_bpt',       target: 'isaiah_bk',       label: 'fulfills Isa 40' },
+  // ── Ezra ──────────────────────────────────────────────────────────────────
+  { id: 'e75', relType: 'biographical', source: 'ezra',           target: 'exile_ev',        label: 'returned from' },
+  { id: 'e76', relType: 'geographic',   source: 'ezra',           target: 'jerusalem',       label: 'restored worship in' },
+  { id: 'e77', relType: 'covenantal',   source: 'ezra',           target: 'covenant',        label: 'renewed' },
+  { id: 'e78', relType: 'geographic',   source: 'ezra',           target: 'babylon',         label: 'departed from' },
+  // ── Esther ────────────────────────────────────────────────────────────────
+  { id: 'e79', relType: 'biographical', source: 'esther',         target: 'exile_ev',        label: 'survived during' },
+  { id: 'e80', relType: 'covenantal',   source: 'esther',         target: 'covenant',        label: 'preserved people of' },
+  { id: 'e81', relType: 'geographic',   source: 'esther',         target: 'babylon',         label: 'lived in Persian diaspora' },
+  { id: 'e82', relType: 'biographical', source: 'esther',         target: 'daniel',          label: 'contemporary of' },
+
+  // ── Fall of Man ───────────────────────────────────────────────────────────
+  { id: 'e83',  relType: 'typological',  source: 'fall_ev',        target: 'messiah',         label: 'necessitates' },
+  { id: 'e84',  relType: 'covenantal',   source: 'fall_ev',        target: 'covenant',        label: 'begins need for' },
+  { id: 'e85',  relType: 'prophetic',    source: 'fall_ev',        target: 'gen315',          label: 'prompted first prophecy' },
+  { id: 'e86',  relType: 'typological',  source: 'fall_ev',        target: 'atonement',       label: 'requires' },
+  { id: 'e87',  relType: 'biographical', source: 'genesis',        target: 'fall_ev',         label: 'records' },
+  // ── Passover ──────────────────────────────────────────────────────────────
+  { id: 'e88',  relType: 'biographical', source: 'moses',          target: 'passover_ev',     label: 'instituted' },
+  { id: 'e89',  relType: 'typological',  source: 'passover_ev',    target: 'crucifixion',     label: 'foreshadows' },
+  { id: 'e90',  relType: 'typological',  source: 'passover_ev',    target: 'atonement',       label: 'prefigures' },
+  { id: 'e91',  relType: 'typological',  source: 'passover_ev',    target: 'messiah',         label: 'type of' },
+  { id: 'e92',  relType: 'geographic',   source: 'passover_ev',    target: 'egypt',           label: 'occurred in' },
+  { id: 'e93',  relType: 'biographical', source: 'exodus_bk',      target: 'passover_ev',     label: 'records' },
+  // ── Crucifixion ───────────────────────────────────────────────────────────
+  { id: 'e94',  relType: 'biographical', source: 'jesus',          target: 'crucifixion',     label: 'subject of' },
+  { id: 'e95',  relType: 'geographic',   source: 'crucifixion',    target: 'jerusalem',       label: 'occurred in' },
+  { id: 'e96',  relType: 'prophetic',    source: 'crucifixion',    target: 'isa53',           label: 'fulfilled' },
+  { id: 'e97',  relType: 'prophetic',    source: 'crucifixion',    target: 'ps22',            label: 'fulfilled' },
+  { id: 'e98',  relType: 'covenantal',   source: 'crucifixion',    target: 'new_covenant',    label: 'sealed' },
+  { id: 'e99',  relType: 'covenantal',   source: 'crucifixion',    target: 'atonement',       label: 'achieved' },
+  { id: 'e100', relType: 'typological',  source: 'crucifixion',    target: 'passover_ev',     label: 'fulfills type of' },
+  { id: 'e101', relType: 'covenantal',   source: 'crucifixion',    target: 'resurrection_ev', label: 'followed by' },
+  // ── Last Supper ───────────────────────────────────────────────────────────
+  { id: 'e102', relType: 'biographical', source: 'jesus',          target: 'last_supper',     label: 'instituted' },
+  { id: 'e103', relType: 'geographic',   source: 'last_supper',    target: 'jerusalem',       label: 'occurred in' },
+  { id: 'e104', relType: 'covenantal',   source: 'last_supper',    target: 'new_covenant',    label: 'inaugurated' },
+  { id: 'e105', relType: 'typological',  source: 'last_supper',    target: 'passover_ev',     label: 'transforms' },
+  // ── Ascension ─────────────────────────────────────────────────────────────
+  { id: 'e106', relType: 'biographical', source: 'jesus',          target: 'ascension',       label: 'subject of' },
+  { id: 'e107', relType: 'geographic',   source: 'ascension',      target: 'jerusalem',       label: 'near' },
+  { id: 'e108', relType: 'covenantal',   source: 'ascension',      target: 'kingdom',         label: 'advances' },
+  { id: 'e109', relType: 'prophetic',    source: 'ascension',      target: 'ps110',           label: 'fulfills' },
+  // ── Sinai / Horeb ─────────────────────────────────────────────────────────
+  { id: 'e110', relType: 'geographic',   source: 'moses',          target: 'sinai',           label: 'received Law at' },
+  { id: 'e111', relType: 'geographic',   source: 'elijah',         target: 'sinai',           label: 'fled to' },
+  { id: 'e112', relType: 'covenantal',   source: 'sinai',          target: 'covenant',        label: 'site of' },
+  { id: 'e113', relType: 'geographic',   source: 'exodus_ev',      target: 'sinai',           label: 'journeyed to' },
+  // ── Bethlehem ─────────────────────────────────────────────────────────────
+  { id: 'e114', relType: 'geographic',   source: 'david',          target: 'bethlehem',       label: 'born in' },
+  { id: 'e115', relType: 'geographic',   source: 'jesus',          target: 'bethlehem',       label: 'born in' },
+  { id: 'e116', relType: 'prophetic',    source: 'bethlehem',      target: 'mic52',           label: 'subject of' },
+  // ── Canaan ────────────────────────────────────────────────────────────────
+  { id: 'e117', relType: 'covenantal',   source: 'abraham',        target: 'canaan',          label: 'promised' },
+  { id: 'e118', relType: 'covenantal',   source: 'canaan',         target: 'covenant',        label: 'object of' },
+  { id: 'e119', relType: 'geographic',   source: 'exodus_ev',      target: 'canaan',          label: 'journeyed toward' },
+  // ── Galilee ───────────────────────────────────────────────────────────────
+  { id: 'e120', relType: 'geographic',   source: 'jesus',          target: 'galilee',         label: 'ministered in' },
+  { id: 'e121', relType: 'geographic',   source: 'peter',          target: 'galilee',         label: 'from' },
+  { id: 'e122', relType: 'geographic',   source: 'nazareth',       target: 'galilee',         label: 'located in' },
+  // ── Genesis 3:15 ──────────────────────────────────────────────────────────
+  { id: 'e123', relType: 'prophetic',    source: 'gen315',         target: 'messiah',         label: 'first predicts' },
+  { id: 'e124', relType: 'biographical', source: 'genesis',        target: 'gen315',          label: 'contains' },
+  { id: 'e125', relType: 'prophetic',    source: 'jesus',          target: 'gen315',          label: 'fulfilled' },
+  // ── Micah 5:2 ─────────────────────────────────────────────────────────────
+  { id: 'e126', relType: 'prophetic',    source: 'mic52',          target: 'messiah',         label: 'predicts birthplace of' },
+  { id: 'e127', relType: 'prophetic',    source: 'jesus',          target: 'mic52',           label: 'fulfilled' },
+  { id: 'e128', relType: 'geographic',   source: 'bethlehem',      target: 'mic52',           label: 'fulfillment site of' },
+  // ── Psalm 16 ──────────────────────────────────────────────────────────────
+  { id: 'e129', relType: 'biographical', source: 'david',          target: 'ps16',            label: 'authored' },
+  { id: 'e130', relType: 'prophetic',    source: 'ps16',           target: 'resurrection_th', label: 'anticipates' },
+  { id: 'e131', relType: 'prophetic',    source: 'jesus',          target: 'ps16',            label: 'fulfilled' },
+  // ── Psalm 110 ─────────────────────────────────────────────────────────────
+  { id: 'e132', relType: 'biographical', source: 'david',          target: 'ps110',           label: 'authored' },
+  { id: 'e133', relType: 'prophetic',    source: 'ps110',          target: 'messiah',         label: 'predicts' },
+  { id: 'e134', relType: 'prophetic',    source: 'jesus',          target: 'ps110',           label: 'fulfilled' },
+  // ── Zechariah 9:9 ────────────────────────────────────────────────────────
+  { id: 'e135', relType: 'prophetic',    source: 'zech99',         target: 'messiah',         label: 'predicts entry of' },
+  { id: 'e136', relType: 'prophetic',    source: 'jesus',          target: 'zech99',          label: 'fulfilled' },
+  { id: 'e137', relType: 'geographic',   source: 'zech99',         target: 'jerusalem',       label: 'predicts entry to' },
+  // ── Atonement ─────────────────────────────────────────────────────────────
+  { id: 'e138', relType: 'typological',  source: 'isa53',          target: 'atonement',       label: 'prophesies' },
+  { id: 'e139', relType: 'covenantal',   source: 'atonement',      target: 'new_covenant',    label: 'grounds' },
+  { id: 'e140', relType: 'covenantal',   source: 'atonement',      target: 'covenant',        label: 'fulfills requirement of' },
+  // ── Temple & Presence ─────────────────────────────────────────────────────
+  { id: 'e141', relType: 'geographic',   source: 'solomon',        target: 'temple_presence', label: 'built Temple' },
+  { id: 'e142', relType: 'geographic',   source: 'jerusalem',      target: 'temple_presence', label: 'housed Temple' },
+  { id: 'e143', relType: 'typological',  source: 'temple_presence',target: 'jesus',           label: 'fulfilled in' },
+  { id: 'e144', relType: 'covenantal',   source: 'temple_presence',target: 'new_covenant',    label: 'transcended by' },
+  { id: 'e145', relType: 'typological',  source: 'exodus_ev',      target: 'temple_presence', label: 'Tabernacle points to' },
+  // ── Holy Spirit ───────────────────────────────────────────────────────────
+  { id: 'e146', relType: 'biographical', source: 'pentecost_ev',   target: 'holy_spirit',     label: 'outpoured' },
+  { id: 'e147', relType: 'covenantal',   source: 'new_covenant',   target: 'holy_spirit',     label: 'promises' },
+  { id: 'e148', relType: 'covenantal',   source: 'jesus',          target: 'holy_spirit',     label: 'sent' },
+  { id: 'e149', relType: 'prophetic',    source: 'isaiah_bk',      target: 'holy_spirit',     label: 'prophesied' },
+  { id: 'e150', relType: 'prophetic',    source: 'john_bpt',       target: 'holy_spirit',     label: 'announced' }
+];
+
+</script>
+<script>
+// Bible Knowledge Map — App State, Sidebar, Detail Panel, Search
+// ──────────────────────────────────────────────────────────────
+
+const APP = {
+  state: {
+    option: 'A',           // 'A' (network) | 'B' (timeline)
+    view: 'network',       // 'network' | 'timeline' | 'map'
+    selectedId: null,
+    hoveredId: null,
+    filters: {
+      testament: { OT: true, NT: true, both: true },
+      types: { person: true, place: true, event: true, theme: true, prophecy: true, book: true },
+      period: 'all',
+      relType: 'all'
+    },
+    search: '',
+    timelinePeriod: 'nt',
+    expandedCards: new Set(),
+    colorMode: 'type',
+    showEdgeLabels: true,
+    navHistory: [],
+    pathHighlight: null
+  },
+
+  listeners: {},
+
+  on(event, fn) {
+    if (!this.listeners[event]) this.listeners[event] = [];
+    this.listeners[event].push(fn);
+  },
+
+  emit(event, data) {
+    (this.listeners[event] || []).forEach(fn => fn(data));
+  },
+
+  // Returns visible node IDs given current filters
+  visibleNodeIds() {
+    const { testament, types, period } = this.state.filters;
+    return NODES
+      .filter(n => {
+        const tOk = testament[n.testament] !== false;
+        const typeOk = types[n.type] !== false;
+        const periodOk = period === 'all' || n.period === period || n.period === null;
+        return tOk && typeOk && periodOk;
+      })
+      .map(n => n.id);
+  },
+
+  visibleEdgeIds() {
+    const vis = new Set(this.visibleNodeIds());
+    const relType = this.state.filters.relType;
+    return EDGES.filter(e =>
+      vis.has(e.source) && vis.has(e.target) &&
+      (relType === 'all' || e.relType === relType)
+    ).map(e => e.id);
+  },
+
+  selectNode(id, suppressHistory = false) {
+    if (!suppressHistory && id && id !== this.state.selectedId) {
+      this.state.navHistory.push(id);
+      if (this.state.navHistory.length > 12) this.state.navHistory.shift();
+    }
+    if (!id) this.state.pathHighlight = null;
+    this.state.selectedId = id;
+    this.emit('nodeSelected', id ? NODES.find(n => n.id === id) : null);
+    renderDetailPanel(id ? NODES.find(n => n.id === id) : null);
+  },
+
+  findPath(fromId, toId) {
+    const adj = {};
+    NODES.forEach(n => { adj[n.id] = []; });
+    EDGES.forEach(e => {
+      const s = typeof e.source === 'object' ? e.source.id : e.source;
+      const t = typeof e.target === 'object' ? e.target.id : e.target;
+      if (adj[s]) adj[s].push({ node: t, edge: e });
+      if (adj[t]) adj[t].push({ node: s, edge: e });
+    });
+    const visited = new Set([fromId]);
+    const queue = [{ path: [fromId], edges: [] }];
+    while (queue.length) {
+      const { path, edges } = queue.shift();
+      const last = path[path.length - 1];
+      for (const { node, edge } of (adj[last] || [])) {
+        if (node === toId) return { nodes: [...path, node], edges: [...edges, edge] };
+        if (!visited.has(node)) {
+          visited.add(node);
+          queue.push({ path: [...path, node], edges: [...edges, edge] });
+        }
+      }
+    }
+    return null;
+  }
+};
+
+// ── SEARCH ──────────────────────────────────────────────────────────────────
+
+function initSearch() {
+  const input = document.getElementById('search-input');
+  const dropdown = document.getElementById('search-dropdown');
+  if (!input || !dropdown) return;
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    APP.state.search = q;
+    if (!q) { dropdown.style.display = 'none'; return; }
+
+    const matches = NODES.filter(n =>
+      n.label.toLowerCase().includes(q) ||
+      (n.summary && n.summary.toLowerCase().includes(q))
+    ).slice(0, 10);
+
+    if (!matches.length) { dropdown.style.display = 'none'; return; }
+
+    dropdown.innerHTML = matches.map(n => {
+      const cfg = NODE_TYPES[n.type];
+      return `<div class="search-item" data-id="${n.id}" style="border-left: 3px solid ${cfg.color}">
+        <span class="search-item-badge" style="background:${cfg.bg};color:${cfg.color}">${cfg.abbr}</span>
+        <span class="search-item-label">${highlightMatch(n.label, q)}</span>
+        <span class="search-item-type">${cfg.label}</span>
+      </div>`;
+    }).join('');
+
+    dropdown.style.display = 'block';
+
+    dropdown.querySelectorAll('.search-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const node = NODES.find(n => n.id === el.dataset.id);
+        if (node) {
+          input.value = node.label;
+          dropdown.style.display = 'none';
+          APP.selectNode(node.id);
+          APP.emit('focusNode', node.id);
+        }
+      });
+    });
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#search-container')) dropdown.style.display = 'none';
+  });
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { dropdown.style.display = 'none'; input.blur(); }
+  });
+}
+
+function highlightMatch(text, q) {
+  const idx = text.toLowerCase().indexOf(q);
+  if (idx === -1) return text;
+  return text.slice(0, idx) +
+    `<mark>${text.slice(idx, idx + q.length)}</mark>` +
+    text.slice(idx + q.length);
+}
+
+// ── SIDEBAR ──────────────────────────────────────────────────────────────────
+
+function renderSidebar() {
+  const sb = document.getElementById('sidebar');
+  if (!sb) return;
+
+  sb.innerHTML = `
+    <div class="sidebar-section">
+      <div class="sidebar-label">Testament</div>
+      <div class="toggle-row">
+        <button class="tog-btn ${APP.state.filters.testament.OT ? 'active' : ''}" data-t="OT">Old Testament</button>
+        <button class="tog-btn ${APP.state.filters.testament.NT ? 'active' : ''}" data-t="NT">New Testament</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Node Category</div>
+      ${Object.entries(NODE_TYPES).map(([k, v]) => `
+        <label class="filter-check">
+          <input type="checkbox" data-type="${k}" ${APP.state.filters.types[k] ? 'checked' : ''}>
+          <span class="check-dot" style="background:${v.color}"></span>
+          <span>${v.label}</span>
+        </label>
+      `).join('')}
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Historical Period</div>
+      <select id="period-select" class="sb-select">
+        <option value="all">All periods</option>
+        ${PERIODS.map(p => `<option value="${p.id}" ${APP.state.filters.period === p.id ? 'selected' : ''}>${p.label}</option>`).join('')}
+      </select>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Relationship Type</div>
+      <div class="rel-type-filters">
+        <button class="rel-type-btn ${APP.state.filters.relType === 'all' ? 'active' : ''}" data-reltype="all">All types</button>
+        ${Object.entries(REL_TYPES).map(([k, v]) => `
+          <button class="rel-type-btn ${APP.state.filters.relType === k ? 'active' : ''}" data-reltype="${k}" style="--rt-color:${v.color}">
+            <svg width="20" height="9" style="flex-shrink:0;vertical-align:middle"><line x1="1" y1="4.5" x2="19" y2="4.5" stroke="${v.color}" stroke-width="2.5" stroke-dasharray="${v.dash || ''}"/></svg>
+            ${v.label}
+          </button>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Path Finder</div>
+      <div class="pf-container">
+        <select id="pf-from" class="sb-select"><option value="">From node…</option>${NODES.map(n => `<option value="${n.id}">${n.label} (${NODE_TYPES[n.type].label})</option>`).join('')}</select>
+        <select id="pf-to" class="sb-select" style="margin-top:4px"><option value="">To node…</option>${NODES.map(n => `<option value="${n.id}">${n.label} (${NODE_TYPES[n.type].label})</option>`).join('')}</select>
+        <button id="pf-btn" class="pf-find-btn">Find Shortest Path</button>
+        <div id="pf-result"></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Legend</div>
+      <div class="legend-grid">
+        ${Object.entries(NODE_TYPES).map(([k, v]) => `
+          <div class="legend-item">
+            ${legendShape(k, v.color)}
+            <span class="legend-text">${v.label}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="sidebar-section sidebar-stats">
+      <div class="sidebar-label">Visible</div>
+      <div id="visible-counts"></div>
+    </div>
+  `;
+
+  updateVisibleCounts();
+
+  // Testament toggles
+  sb.querySelectorAll('.tog-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const t = btn.dataset.t;
+      const cur = APP.state.filters.testament;
+      // 'both' nodes always visible if either OT or NT is on
+      if (t === 'OT') cur.OT = !cur.OT;
+      if (t === 'NT') cur.NT = !cur.NT;
+      cur.both = cur.OT || cur.NT;
+      btn.classList.toggle('active');
+      applyFilters();
+    });
+  });
+
+  // Type checkboxes
+  sb.querySelectorAll('input[data-type]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      APP.state.filters.types[cb.dataset.type] = cb.checked;
+      applyFilters();
+    });
+  });
+
+  // Period select
+  const ps = document.getElementById('period-select');
+  if (ps) {
+    ps.addEventListener('change', () => {
+      APP.state.filters.period = ps.value;
+      applyFilters();
+    });
+  }
+
+  // Relationship type buttons
+  sb.querySelectorAll('.rel-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      APP.state.filters.relType = btn.dataset.reltype;
+      sb.querySelectorAll('.rel-type-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.reltype === btn.dataset.reltype)
+      );
+      applyFilters();
+    });
+  });
+
+  // Path finder
+  const pfBtn = document.getElementById('pf-btn');
+  if (pfBtn) {
+    pfBtn.addEventListener('click', () => {
+      const fromVal = document.getElementById('pf-from').value;
+      const toVal   = document.getElementById('pf-to').value;
+      const result  = document.getElementById('pf-result');
+      if (!fromVal || !toVal) { result.innerHTML = '<div class="pf-msg">Select both nodes.</div>'; return; }
+      if (fromVal === toVal)  { result.innerHTML = '<div class="pf-msg">Same node selected.</div>'; return; }
+      const path = APP.findPath(fromVal, toVal);
+      if (!path) {
+        result.innerHTML = '<div class="pf-msg">No path found between these nodes.</div>';
+        APP.emit('pathHighlight', null);
+      } else {
+        result.innerHTML =
+          `<div class="pf-chain">${path.nodes.map(id => {
+            const n = NODES.find(x => x.id === id);
+            const c = NODE_TYPES[n.type];
+            return `<span class="pf-node" data-id="${id}" style="color:${c.color}">${n.label}</span>`;
+          }).join('<span class="pf-arr">›</span>')}</div>` +
+          `<div class="pf-info">${path.nodes.length - 1} step${path.nodes.length > 2 ? 's' : ''}</div>` +
+          `<button class="pf-clear-btn" id="pf-clear">Clear path</button>`;
+        APP.emit('pathHighlight', path);
+        result.querySelectorAll('.pf-node').forEach(el => {
+          el.style.cursor = 'pointer';
+          el.addEventListener('click', () => { APP.selectNode(el.dataset.id); APP.emit('focusNode', el.dataset.id); });
+        });
+        document.getElementById('pf-clear').addEventListener('click', () => {
+          result.innerHTML = ''; APP.emit('pathHighlight', null);
+        });
+      }
+    });
+  }
+}
+
+function legendShape(type, color) {
+  const s = { w: 20, h: 20 };
+  switch (type) {
+    case 'person':   return `<svg width="${s.w}" height="${s.h}"><circle cx="10" cy="10" r="7" fill="${color}"/></svg>`;
+    case 'place':    return `<svg width="${s.w}" height="${s.h}"><polygon points="10,2 18,10 10,18 2,10" fill="${color}"/></svg>`;
+    case 'event':    return `<svg width="${s.w}" height="${s.h}"><rect x="2" y="4" width="16" height="12" fill="${color}"/></svg>`;
+    case 'theme':    return `<svg width="${s.w}" height="${s.h}"><polygon points="10,1 18,5.5 18,14.5 10,19 2,14.5 2,5.5" fill="${color}"/></svg>`;
+    case 'book':     return `<svg width="${s.w}" height="${s.h}"><rect x="2" y="2" width="16" height="16" rx="3" fill="${color}"/></svg>`;
+    case 'prophecy': return `<svg width="${s.w}" height="${s.h}"><polygon points="10,1 12.9,7.8 20,8.2 14.5,13 16.5,20 10,16 3.5,20 5.5,13 0,8.2 7.1,7.8" fill="${color}"/></svg>`;
+    default:         return `<svg width="${s.w}" height="${s.h}"><circle cx="10" cy="10" r="7" fill="${color}"/></svg>`;
+  }
+}
+
+function updateVisibleCounts() {
+  const el = document.getElementById('visible-counts');
+  if (!el) return;
+  const vis = APP.visibleNodeIds();
+  const counts = {};
+  vis.forEach(id => {
+    const n = NODES.find(x => x.id === id);
+    if (n) counts[n.type] = (counts[n.type] || 0) + 1;
+  });
+  el.innerHTML = Object.entries(counts).map(([type, cnt]) => {
+    const cfg = NODE_TYPES[type];
+    return `<div class="count-row"><span class="count-dot" style="background:${cfg.color}"></span><span>${cfg.label}</span><span class="count-num">${cnt}</span></div>`;
+  }).join('') + `<div class="count-row total-row"><span>Edges</span><span class="count-num">${APP.visibleEdgeIds().length}</span></div>`;
+}
+
+function applyFilters() {
+  updateVisibleCounts();
+  APP.emit('pathHighlight', null);
+  APP.emit('filtersChanged', { nodeIds: APP.visibleNodeIds(), edgeIds: APP.visibleEdgeIds() });
+}
+
+// ── DETAIL PANEL ─────────────────────────────────────────────────────────────
+
+function renderDetailPanel(node) {
+  const panel = document.getElementById('detail-panel');
+  if (!panel) return;
+
+  if (!node) {
+    panel.classList.remove('open');
+    panel.innerHTML = '';
+    return;
+  }
+
+  panel.classList.add('open');
+  const cfg = NODE_TYPES[node.type];
+  const relatedEdges = EDGES.filter(e => e.source === node.id || e.target === node.id);
+
+  // Breadcrumb: previous navigation items (all except current)
+  const histItems = APP.state.navHistory.slice(-6, -1);
+  const breadcrumb = histItems.length ? `<div class="dp-breadcrumb">${histItems.map(hId => {
+    const hn = NODES.find(n => n.id === hId); if (!hn) return '';
+    return `<span class="bc-item" data-id="${hId}">${hn.label}</span><span class="bc-sep">›</span>`;
+  }).join('')}</div>` : '';
+
+  const relItems = relatedEdges.map(edge => {
+    const otherId = edge.source === node.id ? edge.target : edge.source;
+    const other = NODES.find(n => n.id === otherId);
+    if (!other) return '';
+    const oCfg = NODE_TYPES[other.type];
+    const direction = edge.source === node.id ? '→' : '←';
+    return `<div class="rel-item" data-id="${other.id}">
+      <span class="rel-dir">${direction}</span>
+      <span class="rel-label">${edge.label}</span>
+      <span class="rel-target" style="color:${oCfg.color}">${other.label}</span>
+      <span class="rel-type-badge" style="background:${oCfg.bg};color:${oCfg.color}">${oCfg.abbr}</span>
+    </div>`;
+  }).join('');
+
+  const period = node.period ? PERIODS.find(p => p.id === node.period) : null;
+
+  panel.innerHTML = `
+    ${breadcrumb}
+    <div class="dp-header" style="border-left: 4px solid ${cfg.color}">
+      <div class="dp-badge" style="background:${cfg.bg};color:${cfg.color}">${cfg.label}</div>
+      <h2 class="dp-title">${node.label}</h2>
+      ${node.testament ? `<div class="dp-testament">${node.testament === 'both' ? 'Old & New Testament' : node.testament === 'OT' ? 'Old Testament' : 'New Testament'}</div>` : ''}
+      <button class="dp-close" id="dp-close-btn" aria-label="Close">✕</button>
+    </div>
+
+    ${node.dates ? `<div class="dp-section">
+      <div class="dp-section-label">Timeline Placement</div>
+      <div class="dp-dates">${node.dates}</div>
+      ${period ? `<div class="dp-period" style="background:${period.color}22;border-left:3px solid ${period.color};padding:6px 10px;margin-top:6px;font-size:12px;color:${period.color === '#C8A87A' ? '#7A5A2A' : '#3A3A3A'}">${period.label} — ${period.years}</div>` : ''}
+    </div>` : ''}
+
+    ${node.geo && typeof node.geo === 'string' ? `<div class="dp-section">
+      <div class="dp-section-label">Geography</div>
+      <div class="dp-geo">${node.geo}</div>
+    </div>` : ''}
+
+    <div class="dp-section">
+      <div class="dp-section-label">Summary</div>
+      <p class="dp-summary">${node.summary}</p>
+    </div>
+
+    ${node.passages && node.passages.length ? `<div class="dp-section">
+      <div class="dp-section-label">Key Passages</div>
+      <div class="dp-passages">${node.passages.map(p => `<span class="passage-tag">${p}</span>`).join('')}</div>
+    </div>` : ''}
+
+    ${relItems ? `<div class="dp-section">
+      <div class="dp-section-label">Relationships (${relatedEdges.length})</div>
+      <div class="dp-relations">${relItems}</div>
+    </div>` : ''}
+  `;
+
+  panel.querySelector('#dp-close-btn').addEventListener('click', () => APP.selectNode(null));
+  panel.querySelectorAll('.rel-item').forEach(el => {
+    el.addEventListener('click', () => {
+      APP.selectNode(el.dataset.id);
+      APP.emit('focusNode', el.dataset.id);
+    });
+  });
+  panel.querySelectorAll('.bc-item').forEach(el => {
+    el.addEventListener('click', () => {
+      APP.selectNode(el.dataset.id, true);
+      APP.emit('focusNode', el.dataset.id);
+    });
+  });
+}
+
+// ── VIEW SWITCHING ────────────────────────────────────────────────────────────
+
+function initViewSwitcher() {
+  document.querySelectorAll('[data-view]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const v = btn.dataset.view;
+      APP.state.view = v;
+      document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+      document.getElementById('network-view').style.display  = v === 'network'  ? 'flex' : 'none';
+      document.getElementById('timeline-view').style.display = v === 'timeline' ? 'flex' : 'none';
+      document.getElementById('map-view').style.display      = v === 'map'      ? 'flex' : 'none';
+      if (v === 'timeline') renderTimelineView();
+    });
+  });
+}
+
+function initOptionSwitcher() {
+  document.querySelectorAll('[data-option]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const opt = btn.dataset.option;
+      APP.state.option = opt;
+      document.querySelectorAll('[data-option]').forEach(b => b.classList.toggle('active', b.dataset.option === opt));
+      document.getElementById('app-shell').dataset.option = opt;
+      if (opt === 'B') {
+        // Switch to timeline view for option B
+        document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === 'timeline'));
+        document.getElementById('network-view').style.display  = 'none';
+        document.getElementById('timeline-view').style.display = 'flex';
+        document.getElementById('map-view').style.display      = 'none';
+        APP.state.view = 'timeline';
+        renderTimelineView();
+      } else {
+        document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === 'network'));
+        document.getElementById('network-view').style.display  = 'flex';
+        document.getElementById('timeline-view').style.display = 'none';
+        document.getElementById('map-view').style.display      = 'none';
+        APP.state.view = 'network';
+      }
+    });
+  });
+}
+
+</script>
+<script>
+// Bible Knowledge Map — Network View (D3) + Timeline View + Geo Map View
+// ───────────────────────────────────────────────────────────────────────
+
+// ── SHAPE HELPERS ────────────────────────────────────────────────────────────
+
+function diamondPath(r) {
+  return `M 0,${-r} L ${r},0 L 0,${r} L ${-r},0 Z`;
+}
+function hexPath(r) {
+  const pts = Array.from({length: 6}, (_, i) => {
+    const a = (Math.PI / 3) * i - Math.PI / 6;
+    return `${(r * Math.cos(a)).toFixed(2)},${(r * Math.sin(a)).toFixed(2)}`;
+  });
+  return `M ${pts.join(' L ')} Z`;
+}
+function starPath(r) {
+  const inner = r * 0.44;
+  const pts = Array.from({length: 10}, (_, i) => {
+    const rad = i % 2 === 0 ? r : inner;
+    const a = (Math.PI * 2 * i / 10) - Math.PI / 2;
+    return `${(rad * Math.cos(a)).toFixed(2)},${(rad * Math.sin(a)).toFixed(2)}`;
+  });
+  return `M ${pts.join(' L ')} Z`;
+}
+
+// ── COLOR MODE HELPERS ──────────────────────────────────────────────────────────
+function getNodeFill(d) {
+  if (typeof APP !== 'undefined' && APP.state.colorMode === 'period' && d.period) {
+    const p = PERIODS.find(pr => pr.id === d.period);
+    return p ? p.color + '3A' : NODE_TYPES[d.type].bg;
+  }
+  return NODE_TYPES[d.type].bg;
+}
+function getNodeStroke(d) {
+  if (typeof APP !== 'undefined' && APP.state.colorMode === 'period' && d.period) {
+    const p = PERIODS.find(pr => pr.id === d.period);
+    return p ? p.color : NODE_TYPES[d.type].color;
+  }
+  return NODE_TYPES[d.type].color;
+}
+
+// ── D3 NETWORK VIEW ──────────────────────────────────────────────────────────
+
+let networkSim = null;
+let networkSvg = null;
+
+function getNetworkDims(container) {
+  // Try multiple sources, progressively more aggressive
+  const bcrW = container.getBoundingClientRect().width;
+  const bcrH = container.getBoundingClientRect().height;
+  const offW = container.offsetWidth;
+  const offH = container.offsetHeight;
+  const sidebarW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w')) || 252;
+  const winW = window.innerWidth - sidebarW - 10;
+  const winH = window.innerHeight - 100; // option bar + header
+  return {
+    W: bcrW > 10 ? bcrW : (offW > 10 ? offW : winW),
+    H: bcrH > 10 ? bcrH : (offH > 10 ? offH : winH)
+  };
+}
+
+function initNetworkView() {
+  const container = document.getElementById('network-view');
+  if (!container || container.dataset.initialized) return;
+  container.dataset.initialized = 'true';
+
+  const { W, H } = getNetworkDims(container);
+
+  // Deep-clone nodes/edges for D3 (it mutates them)
+  const simNodes = NODES.map(d => Object.assign({}, d));
+  const simEdges = EDGES.map(e => Object.assign({}, e));
+
+  // Degree map — use original EDGES (strings) before D3 replaces them with objects
+  const degreeMap = {};
+  NODES.forEach(n => { degreeMap[n.id] = 0; });
+  EDGES.forEach(e => {
+    degreeMap[e.source] = (degreeMap[e.source] || 0) + 1;
+    degreeMap[e.target] = (degreeMap[e.target] || 0) + 1;
+  });
+  const maxDeg = Math.max(1, ...Object.values(degreeMap));
+  function nodeRadius(d) {
+    return Math.round(13 + Math.min(13, ((degreeMap[d.id] || 1) / maxDeg) * 14));
+  }
+
+  // Seed initial positions by type cluster
+  const clusters = {
+    person: { x: -80, y: 0 }, place: { x: 140, y: 60 },
+    event:  { x: 40,  y: 180 }, theme: { x: -160, y: -140 },
+    book:   { x: -200, y: 80 }, prophecy: { x: 160, y: -140 }
+  };
+  simNodes.forEach(d => {
+    const c = clusters[d.type] || { x: 0, y: 0 };
+    d.x = W / 2 + c.x + (Math.random() - 0.5) * 60;
+    d.y = H / 2 + c.y + (Math.random() - 0.5) * 60;
+  });
+
+  const svg = d3.select(container).append('svg')
+    .attr('width', '100%').attr('height', '100%')
+    .attr('class', 'network-svg');
+
+  networkSvg = svg;
+
+  // Zoom layer
+  const g = svg.append('g').attr('class', 'zoom-layer');
+
+  svg.call(d3.zoom()
+    .scaleExtent([0.15, 3])
+    .on('zoom', ev => g.attr('transform', ev.transform)));
+
+  // Arrow marker
+  svg.append('defs').append('marker')
+    .attr('id', 'arrowhead')
+    .attr('viewBox', '-0 -5 10 10')
+    .attr('refX', 28).attr('refY', 0)
+    .attr('orient', 'auto').attr('markerWidth', 6).attr('markerHeight', 6)
+    .append('path').attr('d', 'M 0,-4 L 10,0 L 0,4').attr('fill', '#B0A898');
+
+  // Force simulation
+  const simulation = d3.forceSimulation(simNodes)
+    .force('link',    d3.forceLink(simEdges).id(d => d.id).distance(130).strength(0.4))
+    .force('charge',  d3.forceManyBody().strength(-420))
+    .force('center',  d3.forceCenter(W / 2, H / 2))
+    .force('collide', d3.forceCollide(d => nodeRadius(d) + 16).strength(0.7));
+
+  networkSim = simulation;
+
+  // Edge layer
+  const linkG = g.append('g').attr('class', 'edges');
+  const edgeSel = linkG.selectAll('.edge').data(simEdges).join('g').attr('class', 'edge');
+
+  edgeSel.append('line')
+    .attr('stroke', d => (REL_TYPES[d.relType] || {color:'#C8BEA8'}).color)
+    .attr('stroke-width', 1.4)
+    .attr('stroke-dasharray', d => (REL_TYPES[d.relType] || {}).dash || null)
+    .attr('stroke-opacity', 0.65)
+    .attr('marker-end', 'url(#arrowhead)');
+
+  edgeSel.append('text')
+    .attr('class', 'edge-label')
+    .attr('text-anchor', 'middle').attr('dy', -5)
+    .attr('font-size', '9.5px').attr('fill', '#9A8E80')
+    .attr('font-family', "'EB Garamond', Georgia, serif")
+    .text(d => d.label);
+
+  // Node layer
+  const nodeG = g.append('g').attr('class', 'nodes');
+  const nodeSel = nodeG.selectAll('.node').data(simNodes).join('g')
+    .attr('class', 'node')
+    .attr('data-id', d => d.id)
+    .style('cursor', 'pointer')
+    .call(d3.drag()
+      .on('start', (ev, d) => { if (!ev.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag',  (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
+      .on('end',   (ev, d) => { if (!ev.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
+    )
+    .on('click', (ev, d) => {
+      ev.stopPropagation();
+      APP.selectNode(d.id === APP.state.selectedId ? null : d.id);
+      updateNodeHighlight(nodeSel, edgeSel);
+    });
+
+  // Shapes by type
+  nodeSel.each(function(d) {
+    const el = d3.select(this);
+    const cfg = NODE_TYPES[d.type];
+    const R = nodeRadius(d);
+    const fill = getNodeFill(d);
+    const strk = getNodeStroke(d);
+
+    el.append('circle').attr('class', 'node-halo').attr('r', R + 10)
+      .attr('fill', 'none').attr('stroke', cfg.color).attr('stroke-width', 2.5).attr('opacity', 0);
+
+    switch (d.type) {
+      case 'person':
+        el.append('circle').attr('class', 'node-shape').attr('r', R).attr('fill', fill).attr('stroke', strk).attr('stroke-width', 1.8);
+        break;
+      case 'place':
+        el.append('path').attr('class', 'node-shape').attr('d', diamondPath(R + 2)).attr('fill', fill).attr('stroke', strk).attr('stroke-width', 1.8);
+        break;
+      case 'event':
+        el.append('rect').attr('class', 'node-shape').attr('x', -R).attr('y', -R * 0.65).attr('width', R * 2).attr('height', R * 1.3)
+          .attr('fill', fill).attr('stroke', strk).attr('stroke-width', 1.8);
+        break;
+      case 'theme':
+        el.append('path').attr('class', 'node-shape').attr('d', hexPath(R + 1)).attr('fill', fill).attr('stroke', strk).attr('stroke-width', 1.8);
+        break;
+      case 'book':
+        el.append('rect').attr('class', 'node-shape').attr('x', -R).attr('y', -R * 0.65).attr('width', R * 2).attr('height', R * 1.3)
+          .attr('rx', 5).attr('fill', fill).attr('stroke', strk).attr('stroke-width', 1.8);
+        break;
+      case 'prophecy':
+        el.append('path').attr('class', 'node-shape').attr('d', starPath(R + 1)).attr('fill', fill).attr('stroke', strk).attr('stroke-width', 1.8);
+        break;
+    }
+
+    el.append('text').attr('text-anchor', 'middle').attr('dy', '0.35em')
+      .attr('font-size', `${Math.max(9, Math.min(13, Math.round(R * 0.62)))}px`).attr('font-weight', '600')
+      .attr('fill', cfg.color).attr('font-family', "system-ui, sans-serif")
+      .text(cfg.abbr);
+
+    el.append('text').attr('class', 'node-label').attr('text-anchor', 'middle').attr('dy', R + 15)
+      .attr('font-size', '11.5px').attr('font-family', "'EB Garamond', Georgia, serif")
+      .attr('fill', '#2A2218').attr('font-weight', '500')
+      .text(d.label);
+  });
+
+  // Hover tooltip
+  nodeSel
+    .on('mouseover', (ev, d) => {
+      const cfg = NODE_TYPES[d.type];
+      const tt = document.getElementById('node-tooltip');
+      if (!tt) return;
+      tt.innerHTML = `<div class="tt-type" style="color:${cfg.color}">${cfg.label}</div><div class="tt-name">${d.label}</div>${d.dates ? `<div class="tt-dates">${d.dates}</div>` : ''}`;
+      tt.style.display = 'block';
+      tt.style.left = (ev.pageX + 14) + 'px';
+      tt.style.top  = (ev.pageY - 10) + 'px';
+    })
+    .on('mousemove', ev => {
+      const tt = document.getElementById('node-tooltip');
+      if (tt) { tt.style.left = (ev.pageX + 14) + 'px'; tt.style.top = (ev.pageY - 10) + 'px'; }
+    })
+    .on('mouseout', () => {
+      const tt = document.getElementById('node-tooltip');
+      if (tt) tt.style.display = 'none';
+    });
+
+  svg.on('click', () => { APP.selectNode(null); updateNodeHighlight(nodeSel, edgeSel); });
+
+  // Tick
+  function applyPositions() {
+    edgeSel.select('line')
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    edgeSel.select('text')
+      .attr('x', d => (d.source.x + d.target.x) / 2)
+      .attr('y', d => (d.source.y + d.target.y) / 2);
+    nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+  }
+
+  // Pre-run 200 ticks synchronously so nodes appear in settled positions immediately
+  simulation.stop();
+  for (let i = 0; i < 200; i++) simulation.tick();
+  applyPositions();
+
+  // Then restart for live dragging interactions
+  simulation.alpha(0.15).restart();
+  simulation.on('tick', applyPositions);
+
+  // ── Keyboard navigation ────────────────────────────────────────────────────
+  let kbNbrIdx = 0; let kbLastSel = null;
+  document.addEventListener('keydown', ev => {
+    if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'SELECT' || ev.target.tagName === 'TEXTAREA') return;
+    if (ev.key === 'Escape') { ev.preventDefault(); APP.selectNode(null); updateNodeHighlight(nodeSel, edgeSel); return; }
+    if (ev.key === 'Tab' && APP.state.selectedId) {
+      ev.preventDefault();
+      const sel = APP.state.selectedId;
+      if (sel !== kbLastSel) { kbNbrIdx = 0; kbLastSel = sel; }
+      const nbrs = [...new Set(EDGES.flatMap(e => {
+        const s = typeof e.source === 'object' ? e.source.id : e.source;
+        const t = typeof e.target === 'object' ? e.target.id : e.target;
+        return s === sel ? [t] : t === sel ? [s] : [];
+      }))];
+      if (!nbrs.length) return;
+      const nxt = nbrs[kbNbrIdx % nbrs.length]; kbNbrIdx++;
+      APP.selectNode(nxt); APP.emit('focusNode', nxt); updateNodeHighlight(nodeSel, edgeSel);
+    }
+  });
+
+  // ── Color mode toggle ──────────────────────────────────────────────────────
+  APP.on('colorModeChanged', () => {
+    nodeSel.each(function(d) {
+      d3.select(this).select('.node-shape')
+        .attr('fill',   getNodeFill(d))
+        .attr('stroke', getNodeStroke(d));
+    });
+  });
+
+  // ── Edge label toggle ──────────────────────────────────────────────────────
+  APP.on('toggleEdgeLabels', show => {
+    edgeSel.select('.edge-label').attr('display', show ? null : 'none');
+  });
+
+  // ── Path highlight ─────────────────────────────────────────────────────────
+  APP.on('pathHighlight', path => {
+    if (!path) {
+      nodeSel.attr('opacity', 1);
+      edgeSel.each(function(d) {
+        const baseColor = (REL_TYPES[d.relType] || {color:'#C8BEA8'}).color;
+        d3.select(this).select('line').attr('stroke', baseColor).attr('stroke-opacity', 0.65).attr('stroke-width', 1.4);
+      });
+      return;
+    }
+    const pathNodeSet = new Set(path.nodes);
+    const pathEdgeSet = new Set(path.edges.map(e => e.id));
+    nodeSel.attr('opacity', d => pathNodeSet.has(d.id) ? 1 : 0.08);
+    edgeSel.each(function(d) {
+      const isPath = pathEdgeSet.has(d.id);
+      const baseColor = (REL_TYPES[d.relType] || {color:'#C8BEA8'}).color;
+      d3.select(this).select('line')
+        .attr('stroke', isPath ? '#3A1A08' : baseColor)
+        .attr('stroke-opacity', isPath ? 1 : 0.04)
+        .attr('stroke-width', isPath ? 3 : 1.4);
+    });
+  });
+
+  // Filter listener
+  APP.on('filtersChanged', ({ nodeIds, edgeIds }) => {
+    const visNodeSet = new Set(nodeIds);
+    const visEdgeSet = new Set(edgeIds);
+    nodeSel.attr('opacity', d => visNodeSet.has(d.id) ? 1 : 0.08);
+    edgeSel.attr('opacity', d => visEdgeSet.has(d.id) ? 0.9 : 0.04);
+  });
+
+  // Focus listener
+  APP.on('focusNode', id => {
+    const nd = simNodes.find(n => n.id === id);
+    if (nd && nd.x != null) {
+      const t = d3.zoomTransform(svg.node());
+      svg.transition().duration(600)
+        .call(d3.zoom().transform, d3.zoomIdentity
+          .translate(W/2 - nd.x, H/2 - nd.y)
+          .scale(1.2));
+    }
+    updateNodeHighlight(nodeSel, edgeSel);
+  });
+
+  // Node selected listener
+  APP.on('nodeSelected', () => updateNodeHighlight(nodeSel, edgeSel));
+}
+
+function updateNodeHighlight(nodeSel, edgeSel) {
+  const sel = APP.state.selectedId;
+  if (!sel) {
+    nodeSel.select('.node-halo').attr('opacity', 0);
+    edgeSel.select('line')
+      .attr('stroke', d => (REL_TYPES[d.relType] || {color:'#C8BEA8'}).color)
+      .attr('stroke-width', 1.4).attr('stroke-opacity', 0.65);
+    edgeSel.select('text').attr('opacity', 0.55);
+    return;
+  }
+  nodeSel.select('.node-halo').attr('opacity', d => d.id === sel ? 1 : 0);
+  const connectedIds = new Set(EDGES
+    .filter(e => e.source === sel || e.target === sel)
+    .flatMap(e => [e.source, e.target]));
+  connectedIds.add(sel);
+  nodeSel.attr('opacity', d => connectedIds.has(d.id) ? 1 : 0.2);
+  edgeSel.each(function(d) {
+    const srcId = typeof d.source === 'object' ? d.source.id : d.source;
+    const tgtId = typeof d.target === 'object' ? d.target.id : d.target;
+    const active = srcId === sel || tgtId === sel;
+    const baseColor = (REL_TYPES[d.relType] || {color:'#C8BEA8'}).color;
+      d3.select(this).select('line')
+        .attr('stroke', active ? '#180A04' : baseColor)
+        .attr('stroke-width', active ? 2.4 : 1.4)
+        .attr('stroke-opacity', active ? 1 : 0.45);
+    d3.select(this).select('text').attr('opacity', active ? 1 : 0.15);
+  });
+}
+
+// ── TIMELINE VIEW (Option B primary) ─────────────────────────────────────────
+
+function renderTimelineView() {
+  const container = document.getElementById('timeline-view');
+  if (!container) return;
+  container.innerHTML = '';
+
+  // Period bar
+  const barEl = document.createElement('div');
+  barEl.className = 'tl-bar';
+  barEl.innerHTML = PERIODS.map(p => `
+    <div class="tl-period ${APP.state.timelinePeriod === p.id ? 'tl-active' : ''}"
+         data-period="${p.id}" style="border-top: 3px solid ${p.color}">
+      <div class="tl-period-name">${p.label}</div>
+      <div class="tl-period-years">${p.years}</div>
+      <div class="tl-period-count">${NODES.filter(n => n.period === p.id).length} entities</div>
+    </div>
+  `).join('');
+  container.appendChild(barEl);
+
+  // Content area
+  const contentEl = document.createElement('div');
+  contentEl.className = 'tl-content';
+  contentEl.id = 'tl-content';
+  container.appendChild(contentEl);
+
+  barEl.querySelectorAll('.tl-period').forEach(el => {
+    el.addEventListener('click', () => {
+      APP.state.timelinePeriod = el.dataset.period;
+      barEl.querySelectorAll('.tl-period').forEach(e => e.classList.remove('tl-active'));
+      el.classList.add('tl-active');
+      renderTimelineContent(el.dataset.period);
+    });
+  });
+
+  renderTimelineContent(APP.state.timelinePeriod);
+}
+
+function renderTimelineContent(periodId) {
+  const el = document.getElementById('tl-content');
+  if (!el) return;
+
+  const period = PERIODS.find(p => p.id === periodId);
+  const periodNodes = NODES.filter(n => n.period === periodId);
+  const themeNodes  = NODES.filter(n => n.type === 'theme' && n.period === null);
+
+  el.innerHTML = '';
+
+  if (!periodNodes.length) {
+    el.innerHTML = `<div class="tl-empty">No entities in this period.</div>`;
+    return;
+  }
+
+  // Period header
+  const hdr = document.createElement('div');
+  hdr.className = 'tl-content-header';
+  hdr.innerHTML = `
+    <h3 style="color:${period.color === '#C8A87A' ? '#7A5A2A' : '#2A2218'}">${period.label}</h3>
+    <span class="tl-years-badge">${period.years}</span>
+    <span class="tl-count-badge">${periodNodes.length} entities</span>
+  `;
+  el.appendChild(hdr);
+
+  // Cards grid
+  const grid = document.createElement('div');
+  grid.className = 'tl-grid';
+
+  const allNodes = [...periodNodes, ...themeNodes];
+
+  allNodes.forEach(node => {
+    const cfg = NODE_TYPES[node.type];
+    const relEdges = EDGES.filter(e => e.source === node.id || e.target === node.id);
+    const expanded = APP.state.expandedCards.has(node.id);
+    const isTheme = node.type === 'theme';
+
+    const card = document.createElement('div');
+    card.className = `tl-card${expanded ? ' expanded' : ''}${isTheme ? ' theme-card' : ''}`;
+    card.style.setProperty('--node-color', cfg.color);
+    card.style.setProperty('--node-bg', cfg.bg);
+
+    card.innerHTML = `
+      <div class="tl-card-header" data-id="${node.id}">
+        <div class="tl-card-type" style="background:${cfg.bg};color:${cfg.color}">${cfg.label}</div>
+        <div class="tl-card-title">${node.label}</div>
+        <button class="tl-expand-btn" title="${expanded ? 'Collapse' : 'Show relationships'}">
+          ${expanded ? '▲' : '▼'}
+        </button>
+      </div>
+      <p class="tl-card-summary">${node.summary.slice(0, 120)}…</p>
+      <div class="tl-card-relations ${expanded ? '' : 'hidden'}">
+        ${relEdges.length ? relEdges.map(edge => {
+          const otherId = edge.source === node.id ? edge.target : edge.source;
+          const other = NODES.find(n => n.id === otherId);
+          if (!other) return '';
+          const oCfg = NODE_TYPES[other.type];
+          const dir = edge.source === node.id ? '→' : '←';
+          return `<div class="tl-rel" data-id="${other.id}">
+            <span class="tl-rel-dir">${dir}</span>
+            <span class="tl-rel-lbl">${edge.label}</span>
+            <span class="tl-rel-node" style="color:${oCfg.color}">${other.label}</span>
+          </div>`;
+        }).join('') : '<div class="tl-rel-none">No direct relationships mapped</div>'}
+      </div>
+      ${node.passages && node.passages.length ? `
+        <div class="tl-passages ${expanded ? '' : 'hidden'}">
+          ${node.passages.map(p => `<span class="passage-tag">${p}</span>`).join('')}
+        </div>` : ''}
+    `;
+
+    // Expand/collapse
+    card.querySelector('.tl-expand-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      if (APP.state.expandedCards.has(node.id)) {
+        APP.state.expandedCards.delete(node.id);
+        card.classList.remove('expanded');
+        card.querySelector('.tl-card-relations').classList.add('hidden');
+        card.querySelectorAll('.tl-passages').forEach(p => p.classList.add('hidden'));
+        card.querySelector('.tl-expand-btn').textContent = '▼';
+      } else {
+        APP.state.expandedCards.add(node.id);
+        card.classList.add('expanded');
+        card.querySelector('.tl-card-relations').classList.remove('hidden');
+        card.querySelectorAll('.tl-passages').forEach(p => p.classList.remove('hidden'));
+        card.querySelector('.tl-expand-btn').textContent = '▲';
+      }
+    });
+
+    // Click header → select node
+    card.querySelector('.tl-card-header').addEventListener('click', () => {
+      APP.selectNode(node.id);
+    });
+
+    // Click related node → select it
+    card.querySelectorAll('.tl-rel').forEach(rel => {
+      rel.addEventListener('click', e => { e.stopPropagation(); APP.selectNode(rel.dataset.id); });
+    });
+
+    grid.appendChild(card);
+  });
+
+  el.appendChild(grid);
+}
+
+// ── GEOGRAPHIC MAP VIEW ──────────────────────────────────────────────────────
+
+function initMapView() {
+  const container = document.getElementById('map-view');
+  if (!container || container.dataset.initialized) return;
+  container.dataset.initialized = 'true';
+
+  const placeNodes = NODES.filter(n => n.type === 'place' && n.geo && typeof n.geo === 'object');
+
+  container.innerHTML = `
+    <div class="map-wrapper">
+      <div class="map-title-bar">Geographic Map — Ancient Near East (Schematic)</div>
+      <svg class="geo-svg" viewBox="0 0 900 520" xmlns="http://www.w3.org/2000/svg">
+        <!-- Ocean background -->
+        <rect width="900" height="520" fill="#A8C8DC"/>
+
+        <!-- North Africa / Egypt -->
+        <path d="M 0,390 L 80,370 L 180,355 L 300,345 L 420,338 L 500,336 L 560,340 L 590,350 L 620,360 L 680,385 L 740,410 L 820,440 L 900,460 L 900,520 L 0,520 Z" fill="#D8CA9A"/>
+
+        <!-- Arabian Peninsula -->
+        <path d="M 590,350 L 660,340 L 740,350 L 810,370 L 860,400 L 900,440 L 900,460 L 820,440 L 740,410 L 660,385 L 610,368 Z" fill="#D4C490"/>
+
+        <!-- Levant / Israel / Jordan / Syria -->
+        <path d="M 530,250 L 580,240 L 620,240 L 650,250 L 660,290 L 650,340 L 620,360 L 590,350 L 560,340 L 540,310 L 530,280 Z" fill="#C8C480"/>
+
+        <!-- Mesopotamia / Iraq -->
+        <path d="M 650,250 L 720,230 L 800,235 L 860,255 L 890,290 L 890,360 L 860,400 L 810,370 L 740,350 L 680,320 L 660,290 Z" fill="#CCC488"/>
+
+        <!-- Turkey / Asia Minor -->
+        <path d="M 400,100 L 500,80 L 620,75 L 720,85 L 800,110 L 840,150 L 830,200 L 790,230 L 720,240 L 660,250 L 620,240 L 580,240 L 530,250 L 500,250 L 470,240 L 440,220 L 420,190 L 400,160 Z" fill="#CCB890"/>
+
+        <!-- Greece / Balkans -->
+        <path d="M 200,140 L 300,120 L 400,100 L 400,160 L 380,200 L 350,230 L 310,250 L 270,258 L 230,245 L 200,220 L 185,190 Z" fill="#C8B888"/>
+        <!-- Greece peninsula -->
+        <path d="M 260,250 L 300,245 L 320,265 L 305,305 L 280,315 L 255,300 L 250,275 Z" fill="#C4B480"/>
+
+        <!-- Italy peninsula -->
+        <path d="M 100,110 L 160,100 L 200,120 L 220,170 L 240,230 L 230,290 L 200,320 L 165,325 L 140,305 L 125,260 L 110,200 L 95,155 Z" fill="#C8B888"/>
+        <!-- Sicily -->
+        <path d="M 170,330 L 210,320 L 225,340 L 210,360 L 175,358 L 160,342 Z" fill="#C4B480"/>
+
+        <!-- Red Sea (thin strip) -->
+        <path d="M 560,355 L 575,360 L 585,380 L 590,415 L 578,440 L 558,445 L 548,420 L 548,390 L 552,368 Z" fill="#9ABDD0"/>
+
+        <!-- Nile River (thin line) -->
+        <path d="M 488,340 L 480,390 L 472,440 L 465,490" stroke="#9ABDD0" stroke-width="4" fill="none" stroke-linecap="round"/>
+
+        <!-- Euphrates / Tigris (thin lines) -->
+        <path d="M 660,250 L 680,300 L 700,355 L 720,400" stroke="#9ABDD0" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <path d="M 700,240 L 710,295 L 720,350 L 730,395" stroke="#9ABDD0" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+
+        <!-- Cyprus -->
+        <ellipse cx="560" cy="225" rx="30" ry="14" fill="#C8B888"/>
+
+        <!-- Water labels -->
+        <text x="250" y="300" font-family="Georgia,serif" font-size="13" fill="#6090A8" font-style="italic" text-anchor="middle">Mediterranean Sea</text>
+        <text x="420" y="200" font-family="Georgia,serif" font-size="11" fill="#6090A8" font-style="italic" text-anchor="middle" transform="rotate(-10,420,200)">Aegean</text>
+
+        <!-- Region labels -->
+        <text x="460" y="440" font-family="Georgia,serif" font-size="12" fill="#8A7A50" text-anchor="middle" font-style="italic">Egypt</text>
+        <text x="750" y="310" font-family="Georgia,serif" font-size="12" fill="#8A7A50" text-anchor="middle" font-style="italic">Mesopotamia</text>
+        <text x="600" y="200" font-family="Georgia,serif" font-size="12" fill="#8A7A50" text-anchor="middle" font-style="italic">Asia Minor</text>
+        <text x="170" y="200" font-family="Georgia,serif" font-size="11" fill="#8A7A50" text-anchor="middle" font-style="italic">Italy</text>
+        <text x="320" y="220" font-family="Georgia,serif" font-size="11" fill="#8A7A50" text-anchor="middle" font-style="italic">Greece</text>
+        <text x="770" y="430" font-family="Georgia,serif" font-size="11" fill="#8A7A50" text-anchor="middle" font-style="italic">Arabia</text>
+
+        <!-- City markers - rendered dynamically -->
+        ${placeNodes.map(n => {
+          const cfg = NODE_TYPES[n.type];
+          const x = n.geo.x, y = n.geo.y;
+          return `
+            <g class="map-node" data-id="${n.id}" style="cursor:pointer">
+              <circle cx="${x}" cy="${y}" r="10" fill="${cfg.color}" stroke="white" stroke-width="2"/>
+              <text x="${x}" y="${y + 4}" font-family="system-ui,sans-serif" font-size="9.5" font-weight="700"
+                fill="white" text-anchor="middle">${cfg.abbr}</text>
+              <text x="${x}" y="${y + 24}" font-family="'EB Garamond',Georgia,serif" font-size="12.5" font-weight="600"
+                fill="#1C1814" text-anchor="middle">${n.label}</text>
+            </g>`;
+        }).join('')}
+      </svg>
+      <div class="map-legend">
+        <span class="map-legend-title">Click a city to view details</span>
+      </div>
+    </div>
+  `;
+
+  container.querySelectorAll('.map-node').forEach(el => {
+    el.addEventListener('click', () => APP.selectNode(el.dataset.id));
+    el.addEventListener('mouseenter', function() {
+      this.querySelector('circle').setAttribute('r', '13');
+    });
+    el.addEventListener('mouseleave', function() {
+      this.querySelector('circle').setAttribute('r', '10');
+    });
+  });
+}
+
+</script>
+<script>
+// ── INITIALIZATION ────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+
+  // Hide hint once user interacts with graph
+  APP.on('nodeSelected', n => {
+    const hint = document.getElementById('network-hint');
+    if (hint && n) hint.style.display = 'none';
+  });
+
+  // Render sidebar
+  renderSidebar();
+
+  // Init search
+  initSearch();
+
+  // Init view + option switchers
+  initViewSwitcher();
+  initOptionSwitcher();
+
+  // Init network view (primary for Option A)
+  // Wait one frame so container has dimensions
+  setTimeout(() => {
+    initNetworkView();
+    initMapView();
+  }, 150);
+
+  // Edge label toggle
+  const elBtn = document.getElementById('edge-label-btn');
+  if (elBtn) {
+    elBtn.addEventListener('click', () => {
+      APP.state.showEdgeLabels = !APP.state.showEdgeLabels;
+      elBtn.classList.toggle('active', APP.state.showEdgeLabels);
+      APP.emit('toggleEdgeLabels', APP.state.showEdgeLabels);
+    });
+  }
+
+  // Color mode toggle
+  const cmBtn = document.getElementById('color-mode-btn');
+  if (cmBtn) {
+    cmBtn.addEventListener('click', () => {
+      APP.state.colorMode = APP.state.colorMode === 'type' ? 'period' : 'type';
+      cmBtn.classList.toggle('active', APP.state.colorMode === 'period');
+      APP.emit('colorModeChanged');
+    });
+  }
+
+  // Update option description on switch
+  const descEl = document.getElementById('opt-desc');
+  document.querySelectorAll('[data-option]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (descEl) {
+        descEl.textContent = btn.dataset.option === 'A'
+          ? 'Network is the primary view; click any node to explore relationships'
+          : 'Timeline is the primary view; expand cards to reveal relationship panels';
+      }
+    });
+  });
+
+});
+</script>
+<!-- Hover tooltip -->
+<div id="node-tooltip"></div>
+
+<!-- Footer credit -->
+<div id="app-footer">
+  Conceived and developed by <a href="https://www.linkedin.com/in/beingbabu/" target="_blank" rel="noopener">Professor Babu George</a>
+</div>
+
+</body>
+</html>
